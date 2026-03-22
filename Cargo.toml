@@ -1,0 +1,20 @@
+[workspace]
+members = [".", "xtask/codegen"]
+
+[package]
+name = "int-interval-set"
+version = "0.1.0"
+edition = "2024"
+description = "Integer half-open interval set structures built on top of int-interval."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/jcfangc/int-interval-set"
+readme = "README.md"
+
+keywords = ["interval", "set", "range", "integer", "algorithms"]
+categories = ["data-structures", "algorithms"]
+
+[dependencies]
+int-interval = "0.6.2"
+
+[dev-dependencies]
+proptest = "1.10.0"
