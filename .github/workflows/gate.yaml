@@ -1,0 +1,31 @@
+name: ci
+
+on:
+  pull_request:
+    branches: ["main"]
+
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Compile Python scripts
+        run: python3 -m compileall .github/scripts
+
+      - name: Check generated files
+        run: python3 .github/scripts/release/check_codegen.py
+
+      - name: Test
+        run: cargo test --locked

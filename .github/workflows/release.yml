@@ -49,6 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+
     steps:
       - uses: actions/checkout@v5
         with:
@@ -56,13 +57,8 @@ jobs:
           persist-credentials: true
 
       - uses: dtolnay/rust-toolchain@stable
+
       - uses: Swatinem/rust-cache@v2
-
-      - name: Check generated files
-        run: python3 .github/scripts/release/check_codegen.py
-
-      - name: Test
-        run: cargo test --locked
 
       - name: Publish
         env:
