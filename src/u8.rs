@@ -274,59 +274,41 @@ pub mod set {
 
 /// Concurrent builder for `U8COSet`.
 ///
-/// The builder accepts concurrent inserts into a skip list. During `seal`,
-/// raw intervals are scanned in sorted order and merged into a canonical
-/// immutable `U8COSet`.
+/// Inserts are first pushed into a concurrent ingress queue. An inserting
+/// thread may opportunistically drain queued intervals into the raw skip set.
+/// During `seal`, any remaining queued intervals are drained before the raw
+/// set is canonicalized into an immutable `U8COSet`.
 pub mod builder {
-    use std::cmp::Ordering;
-
+    use crossbeam_queue::SegQueue;
     use crossbeam_skiplist::SkipSet;
+    use parking_lot::Mutex;
+    use rayon::iter::{FromParallelIterator, IntoParallelIterator, ParallelIterator};
 
     use super::set::U8COSet;
     use super::*;
 
-    /// Private ordering key for storing `U8CO` inside `SkipSet`.
-    ///
-    /// `U8CO` does not need to implement `Ord` in its own crate. This wrapper
-    /// defines the ordering locally:
-    ///
-    /// ```text
-    /// (start, end_excl)
-    /// ```
-    ///
-    /// Because this is a set key, duplicate identical intervals are naturally
-    /// deduplicated during the build phase. That is correct for interval-set
-    /// semantics.
-    #[repr(transparent)]
-    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-    struct Key(U8CO);
-
-    impl Ord for Key {
-        #[inline]
-        fn cmp(&self, other: &Self) -> Ordering {
-            self.0
-                .start()
-                .cmp(&other.0.start())
-                .then_with(|| self.0.end_excl().cmp(&other.0.end_excl()))
-        }
-    }
-
-    impl PartialOrd for Key {
-        #[inline]
-        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-            Some(self.cmp(other))
-        }
-    }
-
     /// Concurrent write-side builder for `U8COSet`.
-    ///
-    /// Insertions are expected `O(log n)` through `crossbeam_skiplist`.
-    /// No merging is performed during insertion; normalization happens once
-    /// in `seal`.
-    #[repr(transparent)]
-    #[derive(Debug, Default)]
+    #[derive(Debug)]
     pub struct U8COSetBuilder {
-        raw: SkipSet<Key>,
+        /// Concurrent producer-facing insertion buffer.
+        ingress: SegQueue<U8CO>,
+
+        /// Ordered raw interval storage drained from `ingress`.
+        raw: SkipSet<U8CO>,
+
+        /// Ensures that at most one inserting thread drains `ingress`.
+        draining: Mutex<()>,
+    }
+
+    impl Default for U8COSetBuilder {
+        #[inline]
+        fn default() -> Self {
+            Self {
+                ingress: SegQueue::new(),
+                raw: SkipSet::new(),
+                draining: Mutex::new(()),
+            }
+        }
     }
 
     impl U8COSetBuilder {
@@ -338,59 +320,109 @@ pub mod builder {
 
         /// Inserts one interval into the builder.
         ///
-        /// This method is safe to call concurrently through shared references.
-        /// Identical intervals are deduplicated by the underlying `SkipSet`.
+        /// The interval is first appended to the concurrent ingress queue.
+        /// This thread then attempts, without blocking, to drain pending
+        /// intervals into the ordered raw skip set.
         #[inline]
         pub fn insert(&self, iv: U8CO) {
-            self.raw.insert(Key(iv));
+            self.ingress.push(iv);
+            self.try_drain();
+        }
+
+        /// Attempts to become the current drainer.
+        ///
+        /// Failure to acquire the lock is harmless: another inserting thread
+        /// is already draining, or any remaining queued intervals will be
+        /// drained by a later insert or by `seal`.
+        #[inline]
+        fn try_drain(&self) {
+            let Some(_draining) = self.draining.try_lock() else {
+                return;
+            };
+
+            self.drain_ingress();
+        }
+
+        /// Moves every currently available queued interval into `raw`.
+        ///
+        /// The caller must ensure there is at most one active drainer.
+        #[inline]
+        fn drain_ingress(&self) {
+            while let Some(iv) = self.ingress.pop() {
+                self.raw.insert(iv);
+            }
         }
 
         /// Consumes the builder and returns a canonical immutable set.
         ///
-        /// The merge process is linear over the sorted skip-list iterator:
-        ///
-        /// - maintain one pending interval `cur`;
-        /// - if the next interval overlaps or is adjacent, replace `cur` with
-        ///   its convex hull;
-        /// - otherwise, push `cur` and start a new pending interval;
-        /// - finally, push the last pending interval.
+        /// Because `self` is consumed, no safe concurrent inserts can still
+        /// access this builder. Any intervals left in `ingress` are drained
+        /// before canonicalization.
         pub fn seal(self) -> U8COSet {
-            let mut iter = self.raw.iter().map(|entry| entry.value().0);
+            self.drain_ingress();
 
-            let Some(mut cur) = iter.next() else {
-                // SAFETY:
-                // The empty interval list is canonical.
-                return unsafe { U8COSet::new_unchecked(Vec::new()) };
-            };
-
-            let mut out = Vec::new();
-
-            for iv in iter {
-                if cur.is_contiguous_with(iv) {
-                    cur = cur.convex_hull(iv);
-                } else {
-                    out.push(cur);
-                    cur = iv;
-                }
-            }
-
-            out.push(cur);
+            let out = canonicalize_sorted(self.raw.iter().map(|entry| *entry.value()));
 
             // SAFETY:
-            // `self.raw` iterates keys in ascending `(start, end_excl)` order.
-            // The loop maintains one pending merged interval `cur`.
-            //
-            // If `iv` is contiguous with or overlaps `cur`, both are replaced
-            // by their convex hull, so no overlap or adjacency is emitted.
-            //
-            // If `iv` is disjoint from `cur`, then sorted order plus the failed
-            // contiguity test imply `cur.end_excl() < iv.start()`. Pushing
-            // `cur` therefore preserves the canonical invariant.
-            //
-            // After the loop, the final pending interval is pushed. Therefore
-            // `out` is sorted, non-overlapping, and contains no adjacent
-            // intervals.
+            // `self.raw` iterates intervals in ascending `U8CO` order.
+            // `canonicalize_sorted` merges all overlapping or adjacent
+            // intervals, so `out` is sorted, non-overlapping, and contains
+            // no adjacent intervals.
             unsafe { U8COSet::new_unchecked(out) }
+        }
+    }
+
+    fn canonicalize_sorted<I>(intervals: I) -> Vec<U8CO>
+    where
+        I: IntoIterator<Item = U8CO>,
+    {
+        let mut iter = intervals.into_iter();
+
+        let Some(mut cur) = iter.next() else {
+            return Vec::new();
+        };
+
+        let mut out = Vec::new();
+
+        for iv in iter {
+            if cur.is_contiguous_with(iv) {
+                cur = cur.convex_hull(iv);
+            } else {
+                out.push(cur);
+                cur = iv;
+            }
+        }
+
+        out.push(cur);
+        out
+    }
+
+    impl FromIterator<U8CO> for U8COSetBuilder {
+        #[inline]
+        fn from_iter<T: IntoIterator<Item = U8CO>>(iter: T) -> Self {
+            let builder = Self::new();
+
+            for iv in iter {
+                builder.insert(iv);
+            }
+
+            builder
+        }
+    }
+
+    impl FromParallelIterator<U8CO> for U8COSetBuilder {
+        #[inline]
+        fn from_par_iter<T>(iter: T) -> Self
+        where
+            T: IntoParallelIterator<Item = U8CO>,
+        {
+            let builder = Self::new();
+
+            iter.into_par_iter().for_each(|iv| {
+                builder.insert(iv);
+            });
+
+            builder
         }
     }
 }

@@ -278,45 +278,10 @@ pub mod set {
 /// raw intervals are scanned in sorted order and merged into a canonical
 /// immutable `I8COSet`.
 pub mod builder {
-    use std::cmp::Ordering;
-
     use crossbeam_skiplist::SkipSet;
 
     use super::set::I8COSet;
     use super::*;
-
-    /// Private ordering key for storing `I8CO` inside `SkipSet`.
-    ///
-    /// `I8CO` does not need to implement `Ord` in its own crate. This wrapper
-    /// defines the ordering locally:
-    ///
-    /// ```text
-    /// (start, end_excl)
-    /// ```
-    ///
-    /// Because this is a set key, duplicate identical intervals are naturally
-    /// deduplicated during the build phase. That is correct for interval-set
-    /// semantics.
-    #[repr(transparent)]
-    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-    struct Key(I8CO);
-
-    impl Ord for Key {
-        #[inline]
-        fn cmp(&self, other: &Self) -> Ordering {
-            self.0
-                .start()
-                .cmp(&other.0.start())
-                .then_with(|| self.0.end_excl().cmp(&other.0.end_excl()))
-        }
-    }
-
-    impl PartialOrd for Key {
-        #[inline]
-        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-            Some(self.cmp(other))
-        }
-    }
 
     /// Concurrent write-side builder for `I8COSet`.
     ///
@@ -326,7 +291,7 @@ pub mod builder {
     #[repr(transparent)]
     #[derive(Debug, Default)]
     pub struct I8COSetBuilder {
-        raw: SkipSet<Key>,
+        raw: SkipSet<I8CO>,
     }
 
     impl I8COSetBuilder {
@@ -342,7 +307,7 @@ pub mod builder {
         /// Identical intervals are deduplicated by the underlying `SkipSet`.
         #[inline]
         pub fn insert(&self, iv: I8CO) {
-            self.raw.insert(Key(iv));
+            self.raw.insert(iv);
         }
 
         /// Consumes the builder and returns a canonical immutable set.
@@ -355,7 +320,7 @@ pub mod builder {
         /// - otherwise, push `cur` and start a new pending interval;
         /// - finally, push the last pending interval.
         pub fn seal(self) -> I8COSet {
-            let mut iter = self.raw.iter().map(|entry| entry.value().0);
+            let mut iter = self.raw.into_iter();
 
             let Some(mut cur) = iter.next() else {
                 // SAFETY:
