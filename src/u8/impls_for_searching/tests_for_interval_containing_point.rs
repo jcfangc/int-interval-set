@@ -1,19 +1,21 @@
-use crate::u8::tests::{
-    set::test_support::build,
-    test_support::{MID_VALUE, build_from_vec, interval_pair, iv},
+use proptest::prelude::*;
+
+use crate::{
+    U8COSet,
+    u8::test_support::{arb_iv, build, iv},
 };
 
 #[test]
-fn search_point_returns_none_on_empty_set() {
+fn returns_none_on_empty_set() {
     let set = build([]);
 
     assert_eq!(set.interval_containing_point(u8::MIN), None);
-    assert_eq!(set.interval_containing_point(MID_VALUE), None);
+    assert_eq!(set.interval_containing_point(u8::MAX / 2), None);
     assert_eq!(set.interval_containing_point(u8::MAX), None);
 }
 
 #[test]
-fn search_point_respects_half_open_bounds() {
+fn respects_half_open_bounds() {
     let set = build([(10, 20)]);
 
     assert_eq!(set.interval_containing_point(9), None);
@@ -23,7 +25,7 @@ fn search_point_respects_half_open_bounds() {
 }
 
 #[test]
-fn search_point_returns_matching_interval_across_multiple_intervals() {
+fn returns_matching_interval_across_multiple_intervals() {
     let set = build([(10, 20), (30, 40), (50, 60)]);
 
     assert_eq!(set.interval_containing_point(10), Some(iv(10, 20)));
@@ -37,7 +39,7 @@ fn search_point_returns_matching_interval_across_multiple_intervals() {
 }
 
 #[test]
-fn search_point_returns_merged_interval_after_canonicalization() {
+fn returns_merged_interval_after_canonicalization() {
     let set = build([(0, 5), (5, 10), (12, 20), (18, 30)]);
 
     assert_eq!(set.as_slice(), &[iv(0, 10), iv(12, 30)]);
@@ -52,7 +54,7 @@ fn search_point_returns_merged_interval_after_canonicalization() {
 }
 
 #[test]
-fn search_point_handles_domain_edges() {
+fn handles_domain_edges() {
     let set = build([(u8::MIN, u8::MIN + 1), (u8::MAX - 1, u8::MAX)]);
 
     assert_eq!(
@@ -69,7 +71,7 @@ fn search_point_handles_domain_edges() {
 }
 
 #[test]
-fn search_point_matches_contains_point_predicate() {
+fn representative_points_match_contains_point_predicate() {
     let set = build([(10, 20), (30, 40), (50, 60)]);
 
     for x in [u8::MIN, 9, 10, 19, 20, 30, 39, 40, 55, 60, u8::MAX] {
@@ -81,18 +83,15 @@ fn search_point_matches_contains_point_predicate() {
     }
 }
 
-use proptest::prelude::*;
-
 proptest! {
     #[test]
     fn prop_interval_containing_point_matches_slice_find(
-        xs in prop::collection::vec(interval_pair(), 0..64),
+        xs in prop::collection::vec(arb_iv(), 0..64),
         x in any::<u8>(),
     ) {
-        let set = build_from_vec(xs);
+        let set: U8COSet = xs.into_iter().collect();
 
         let got = set.interval_containing_point(x);
-
         let expected = set
             .as_slice()
             .iter()
@@ -104,10 +103,10 @@ proptest! {
 
     #[test]
     fn prop_interval_containing_point_matches_contains_point(
-        xs in prop::collection::vec(interval_pair(), 0..64),
+        xs in prop::collection::vec(arb_iv(), 0..64),
         x in any::<u8>(),
     ) {
-        let set = build_from_vec(xs);
+        let set: U8COSet = xs.into_iter().collect();
 
         prop_assert_eq!(
             set.interval_containing_point(x).is_some(),

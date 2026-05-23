@@ -1,10 +1,12 @@
-use crate::u8::tests::{
-    set::test_support::build,
-    test_support::{MID_VALUE, build_from_vec, interval_pair, iv},
+use proptest::prelude::*;
+
+use crate::{
+    U8COSet,
+    u8::test_support::{arb_iv, build, iv},
 };
 
 #[test]
-fn predicates_contains_point_respects_half_open_bounds() {
+fn contains_point_respects_half_open_bounds() {
     let set = build([(10, 20)]);
 
     assert!(!set.contains_point(9));
@@ -14,7 +16,7 @@ fn predicates_contains_point_respects_half_open_bounds() {
 }
 
 #[test]
-fn predicates_contains_point_works_across_multiple_intervals() {
+fn contains_point_works_across_multiple_intervals() {
     let set = build([(10, 20), (30, 40), (50, 60)]);
 
     assert!(set.contains_point(10));
@@ -28,16 +30,16 @@ fn predicates_contains_point_works_across_multiple_intervals() {
 }
 
 #[test]
-fn predicates_contains_point_works_on_empty_set() {
+fn contains_point_works_on_empty_set() {
     let set = build([]);
 
     assert!(!set.contains_point(u8::MIN));
-    assert!(!set.contains_point(MID_VALUE));
+    assert!(!set.contains_point(u8::MAX / 2));
     assert!(!set.contains_point(u8::MAX));
 }
 
 #[test]
-fn predicates_contains_interval_accepts_fully_covered_query() {
+fn contains_interval_accepts_fully_covered_query() {
     let set = build([(10, 20), (30, 40)]);
 
     assert!(set.contains_interval(iv(10, 20)));
@@ -46,7 +48,7 @@ fn predicates_contains_interval_accepts_fully_covered_query() {
 }
 
 #[test]
-fn predicates_contains_interval_rejects_partial_or_gap_crossing_query() {
+fn contains_interval_rejects_partial_or_gap_crossing_query() {
     let set = build([(10, 20), (30, 40)]);
 
     assert!(!set.contains_interval(iv(9, 11)));
@@ -57,7 +59,7 @@ fn predicates_contains_interval_rejects_partial_or_gap_crossing_query() {
 }
 
 #[test]
-fn predicates_contains_interval_works_after_canonical_merge() {
+fn contains_interval_uses_canonical_merged_intervals() {
     let set = build([(0, 5), (5, 10), (12, 20), (18, 30)]);
 
     assert_eq!(set.as_slice(), &[iv(0, 10), iv(12, 30)]);
@@ -71,7 +73,7 @@ fn predicates_contains_interval_works_after_canonical_merge() {
 }
 
 #[test]
-fn predicates_contains_interval_works_on_empty_set() {
+fn contains_interval_works_on_empty_set() {
     let set = build([]);
 
     assert!(!set.contains_interval(iv(0, 1)));
@@ -80,7 +82,7 @@ fn predicates_contains_interval_works_on_empty_set() {
 }
 
 #[test]
-fn predicates_intersects_interval_accepts_overlap_on_left_middle_and_right() {
+fn intersects_interval_accepts_overlap_on_left_middle_and_right() {
     let set = build([(10, 20), (30, 40)]);
 
     assert!(set.intersects_interval(iv(5, 11)));
@@ -93,7 +95,7 @@ fn predicates_intersects_interval_accepts_overlap_on_left_middle_and_right() {
 }
 
 #[test]
-fn predicates_intersects_interval_rejects_adjacent_or_disjoint_query() {
+fn intersects_interval_rejects_adjacent_or_disjoint_query() {
     let set = build([(10, 20), (30, 40)]);
 
     assert!(!set.intersects_interval(iv(0, 10)));
@@ -103,7 +105,7 @@ fn predicates_intersects_interval_rejects_adjacent_or_disjoint_query() {
 }
 
 #[test]
-fn predicates_intersects_interval_accepts_query_spanning_gap() {
+fn intersects_interval_accepts_query_spanning_gap() {
     let set = build([(10, 20), (30, 40)]);
 
     assert!(set.intersects_interval(iv(15, 35)));
@@ -111,7 +113,7 @@ fn predicates_intersects_interval_accepts_query_spanning_gap() {
 }
 
 #[test]
-fn predicates_intersects_interval_works_on_empty_set() {
+fn intersects_interval_works_on_empty_set() {
     let set = build([]);
 
     assert!(!set.intersects_interval(iv(0, 1)));
@@ -136,15 +138,13 @@ fn predicates_handle_domain_edges() {
     assert!(set.intersects_interval(iv(u8::MAX - 1, u8::MAX)));
 }
 
-use proptest::prelude::*;
-
 proptest! {
     #[test]
     fn prop_contains_point_matches_point_search(
-        xs in prop::collection::vec(interval_pair(), 0..64),
+        xs in prop::collection::vec(arb_iv(), 0..64),
         x in any::<u8>(),
     ) {
-        let set = build_from_vec(xs);
+        let set: U8COSet = xs.into_iter().collect();
 
         prop_assert_eq!(
             set.contains_point(x),
@@ -154,11 +154,10 @@ proptest! {
 
     #[test]
     fn prop_intersects_interval_matches_interval_search(
-        xs in prop::collection::vec(interval_pair(), 0..64),
-        query in interval_pair(),
+        xs in prop::collection::vec(arb_iv(), 0..64),
+        query in arb_iv(),
     ) {
-        let set = build_from_vec(xs);
-        let query = iv(query.0, query.1);
+        let set: U8COSet = xs.into_iter().collect();
 
         prop_assert_eq!(
             set.intersects_interval(query),
@@ -167,15 +166,30 @@ proptest! {
     }
 
     #[test]
-    fn prop_contains_interval_implies_intersects_interval(
-        xs in prop::collection::vec(interval_pair(), 0..64),
-        query in interval_pair(),
+    fn prop_contains_interval_implies_intersection(
+        xs in prop::collection::vec(arb_iv(), 0..64),
+        query in arb_iv(),
     ) {
-        let set = build_from_vec(xs);
-        let query = iv(query.0, query.1);
+        let set: U8COSet = xs.into_iter().collect();
 
         if set.contains_interval(query) {
             prop_assert!(set.intersects_interval(query));
         }
+    }
+
+    #[test]
+    fn prop_contains_interval_matches_single_covering_canonical_interval(
+        xs in prop::collection::vec(arb_iv(), 0..64),
+        query in arb_iv(),
+    ) {
+        let set: U8COSet = xs.into_iter().collect();
+
+        let expected = set
+            .as_slice()
+            .iter()
+            .copied()
+            .any(|interval| interval.contains_interval(query));
+
+        prop_assert_eq!(set.contains_interval(query), expected);
     }
 }
