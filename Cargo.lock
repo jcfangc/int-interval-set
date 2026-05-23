@@ -201,7 +201,7 @@ checksum = "fad6422ff79fbc8a782b3530fac21c833082d9cf4b593dfe654f86e2c0dd4ebb"
 
 [[package]]
 name = "int-interval-set"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "crossbeam-queue",
  "crossbeam-skiplist",

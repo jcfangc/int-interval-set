@@ -1,6 +1,20 @@
 use super::*;
 
 impl U8COSet {
+    /// Returns the canonical source range intersecting or adjacent to `query`.
+    #[inline]
+    fn contiguous_range_with_interval(&self, query: U8CO) -> std::ops::Range<usize> {
+        let start = self
+            .intervals
+            .partition_point(|interval| interval.end_excl() < query.start());
+
+        let end = start
+            + self.intervals[start..]
+                .partition_point(|interval| interval.start() <= query.end_excl());
+
+        start..end
+    }
+
     /// Returns the intersection of this set with `query`.
     ///
     /// The returned set contains the clipped segments of all canonical
@@ -49,31 +63,25 @@ impl U8COSet {
     /// slice must be allocated and populated.
     #[inline]
     pub fn union_with_interval(&self, query: U8CO) -> Self {
-        let merge_start = self
-            .intervals
-            .partition_point(|iv| iv.end_excl() < query.start());
+        let range = self.contiguous_range_with_interval(query);
 
-        let merge_end = merge_start
-            + self.intervals[merge_start..].partition_point(|iv| iv.start() <= query.end_excl());
-
-        let merged = if merge_start == merge_end {
+        let merged = if range.is_empty() {
             query
         } else {
-            self.intervals[merge_start]
+            self.intervals[range.start]
                 .convex_hull(query)
-                .convex_hull(self.intervals[merge_end - 1])
+                .convex_hull(self.intervals[range.end - 1])
         };
 
-        let mut intervals =
-            Vec::with_capacity(self.intervals.len() - (merge_end - merge_start) + 1);
+        let mut intervals = Vec::with_capacity(self.intervals.len() - range.len() + 1);
 
-        intervals.extend_from_slice(&self.intervals[..merge_start]);
+        intervals.extend_from_slice(&self.intervals[..range.start]);
         intervals.push(merged);
-        intervals.extend_from_slice(&self.intervals[merge_end..]);
+        intervals.extend_from_slice(&self.intervals[range.end..]);
 
         // SAFETY:
         // - Prefix and suffix are unchanged canonical slices.
-        // - `merge_start..merge_end` contains exactly the intervals contiguous
+        // - `range` contains exactly the intervals contiguous
         //   with `query`, including adjacency.
         // - They are replaced by their single convex hull with `query`.
         // - The remaining prefix and suffix are strictly separated from
@@ -162,32 +170,23 @@ impl U8COSet {
     /// intervals in the union component affected by `query`.
     #[inline]
     pub fn symmetric_difference_with_interval(&self, query: U8CO) -> Self {
-        let component_start = self
-            .intervals
-            .partition_point(|interval| interval.end_excl() < query.start());
+        let range = self.contiguous_range_with_interval(query);
 
-        let component_end = component_start
-            + self.intervals[component_start..]
-                .partition_point(|interval| interval.start() <= query.end_excl());
-
-        if component_start == component_end {
+        if range.is_empty() {
             return self.union_with_interval(query);
         }
 
-        let component = self.intervals[component_start]
+        let union_component = self.intervals[range.start]
             .convex_hull(query)
-            .convex_hull(self.intervals[component_end - 1]);
+            .convex_hull(self.intervals[range.end - 1]);
 
         let mut intervals = Vec::with_capacity(self.intervals.len() + 1);
 
-        intervals.extend_from_slice(&self.intervals[..component_start]);
+        intervals.extend_from_slice(&self.intervals[..range.start]);
 
-        let mut cursor = component.start();
+        let mut cursor = union_component.start();
 
-        for source in self.intervals[component_start..component_end]
-            .iter()
-            .copied()
-        {
+        for source in self.intervals[range.clone()].iter().copied() {
             let Some(overlap) = source.intersection(query) else {
                 continue;
             };
@@ -199,22 +198,16 @@ impl U8COSet {
             cursor = overlap.end_excl();
         }
 
-        if let Some(residual) = U8CO::try_new(cursor, component.end_excl()) {
+        if let Some(residual) = U8CO::try_new(cursor, union_component.end_excl()) {
             intervals.push(residual);
         }
 
-        intervals.extend_from_slice(&self.intervals[component_end..]);
+        intervals.extend_from_slice(&self.intervals[range.end..]);
 
         // SAFETY:
-        // - Prefix and suffix are unchanged canonical subsequences.
-        // - `component` is the canonical union component containing `query`
-        //   and every source interval intersecting or adjacent to it.
-        // - The emitted residuals are exactly `component` with all positive
-        //   intersections with `query` removed.
-        // - Because adjacency was included in `component`, emitted residuals
-        //   cannot become adjacent to retained prefix or suffix intervals.
-        // - All emitted intervals are ordered, non-overlapping, and
-        //   non-adjacent.
+        // The middle output is `union_component` with all positive intersections
+        // with `query` removed. Because `range` includes adjacent source
+        // intervals, the retained prefix and suffix remain strictly separated.
         unsafe { Self::new_unchecked(intervals) }
     }
 }
@@ -222,7 +215,7 @@ impl U8COSet {
 #[cfg(test)]
 mod tests_for_difference;
 #[cfg(test)]
-mod tests_for_intersections;
+mod tests_for_intersection;
 #[cfg(test)]
 mod tests_for_symmetric_difference;
 #[cfg(test)]
