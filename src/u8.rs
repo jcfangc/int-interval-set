@@ -29,3 +29,5 @@ mod impls_for_construction;
 mod impls_for_find_out_coverage;
 mod impls_for_predicates;
 mod impls_for_searching;
+
+mod funcs_for_canonicalization;

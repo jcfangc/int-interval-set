@@ -1,5 +1,7 @@
 use rayon::iter::{FromParallelIterator, IntoParallelIterator, ParallelIterator};
 
+use crate::u8::funcs_for_canonicalization::{is_canonical, merge, normalize};
+
 use super::*;
 
 const BATCH_SIZE: usize = 128;
@@ -27,15 +29,6 @@ impl U8COSet {
             intervals: Arc::from(intervals.into_boxed_slice()),
         }
     }
-}
-
-/// Checks the canonical invariant used by binary-search queries.
-///
-/// `U8CO` itself already guarantees single-interval validity. This
-/// function only checks the relationship between adjacent intervals.
-#[inline]
-fn is_canonical(intervals: &[U8CO]) -> bool {
-    intervals.windows(2).all(|w| w[0].end_excl() < w[1].start())
 }
 
 impl FromIterator<U8CO> for U8COSet {
@@ -107,89 +100,6 @@ impl FromParallelIterator<U8CO> for U8COSet {
         // Every parallel fold result is canonical, and `merge` preserves the
         // canonical interval invariant during reduction.
         unsafe { U8COSet::new_unchecked(reduced) }
-    }
-}
-
-#[inline]
-fn normalize(mut intervals: Vec<U8CO>) -> Vec<U8CO> {
-    intervals.sort_unstable();
-    canonicalize_sorted(intervals)
-}
-
-#[inline]
-fn merge(left: Vec<U8CO>, right: Vec<U8CO>) -> Vec<U8CO> {
-    if left.is_empty() {
-        return right;
-    }
-
-    if right.is_empty() {
-        return left;
-    }
-
-    canonicalize_sorted(merge_sorted(left, right))
-}
-
-fn canonicalize_sorted<I>(intervals: I) -> Vec<U8CO>
-where
-    I: IntoIterator<Item = U8CO>,
-{
-    let mut iter = intervals.into_iter();
-
-    let Some(mut cur) = iter.next() else {
-        return Vec::new();
-    };
-
-    let mut out = Vec::new();
-
-    for iv in iter {
-        if cur.is_contiguous_with(iv) {
-            cur = cur.convex_hull(iv);
-        } else {
-            out.push(cur);
-            cur = iv;
-        }
-    }
-
-    out.push(cur);
-    out
-}
-
-fn merge_sorted<I, J>(left: I, right: J) -> impl Iterator<Item = U8CO>
-where
-    I: IntoIterator<Item = U8CO>,
-    J: IntoIterator<Item = U8CO>,
-{
-    struct Merge<I, J>
-    where
-        I: Iterator<Item = U8CO>,
-        J: Iterator<Item = U8CO>,
-    {
-        left: std::iter::Peekable<I>,
-        right: std::iter::Peekable<J>,
-    }
-
-    impl<I, J> Iterator for Merge<I, J>
-    where
-        I: Iterator<Item = U8CO>,
-        J: Iterator<Item = U8CO>,
-    {
-        type Item = U8CO;
-
-        #[inline]
-        fn next(&mut self) -> Option<Self::Item> {
-            match (self.left.peek(), self.right.peek()) {
-                (Some(left), Some(right)) if left <= right => self.left.next(),
-                (Some(_), Some(_)) => self.right.next(),
-                (Some(_), None) => self.left.next(),
-                (None, Some(_)) => self.right.next(),
-                (None, None) => None,
-            }
-        }
-    }
-
-    Merge {
-        left: left.into_iter().peekable(),
-        right: right.into_iter().peekable(),
     }
 }
 
