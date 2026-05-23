@@ -51,7 +51,7 @@ fn query_across_multiple_intervals_sums_clipped_segments() {
     let query = iv(15, 55);
 
     assert_eq!(
-        set.intersections(query).collect::<Vec<_>>(),
+        set.intersection_with_interval(query).as_slice().to_vec(),
         vec![iv(15, 20), iv(30, 40), iv(50, 55)]
     );
     assert_eq!(set.covered_len_of(query), 20);
@@ -66,7 +66,7 @@ fn coverage_is_computed_from_canonical_merged_intervals() {
 
     assert_eq!(set.as_slice(), &[iv(0, 10), iv(12, 30)]);
     assert_eq!(
-        set.intersections(query).collect::<Vec<_>>(),
+        set.intersection_with_interval(query).as_slice().to_vec(),
         vec![iv(5, 10), iv(12, 15)]
     );
     assert_eq!(set.covered_len_of(query), 8);
@@ -187,7 +187,7 @@ proptest! {
     ) {
         let set: U8COSet = xs.into_iter().collect();
 
-        let expected: u8 = set.intersections(query).map(|iv| iv.len()).sum();
+        let expected: u8 = set.intersection_with_interval(query).iter_intervals().map(|iv| iv.len()).sum();
 
         prop_assert_eq!(set.covered_len_of(query), expected);
     }

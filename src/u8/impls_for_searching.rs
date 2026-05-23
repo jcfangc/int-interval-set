@@ -21,9 +21,6 @@ impl U8COSet {
     }
 }
 
-#[cfg(test)]
-mod tests_for_intervals_intersecting;
-
 impl U8COSet {
     /// Returns the unique interval containing `x`, if any.
     ///
@@ -46,3 +43,5 @@ impl U8COSet {
 
 #[cfg(test)]
 mod tests_for_interval_containing_point;
+#[cfg(test)]
+mod tests_for_intervals_intersecting;

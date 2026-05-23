@@ -24,8 +24,8 @@ pub struct U8COSet {
 }
 
 mod impls_for_accessors;
+mod impls_for_algebra;
 mod impls_for_construction;
 mod impls_for_find_out_coverage;
 mod impls_for_predicates;
 mod impls_for_searching;
-mod impls_for_set_algebra;

@@ -20,7 +20,7 @@ impl U8COSet {
     /// Violating this invariant can make binary-search based queries
     /// return incorrect results.
     #[inline]
-    unsafe fn new_unchecked(intervals: Vec<U8CO>) -> Self {
+    pub(super) unsafe fn new_unchecked(intervals: Vec<U8CO>) -> Self {
         debug_assert!(is_canonical(&intervals));
 
         Self {

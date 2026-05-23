@@ -9,7 +9,10 @@ impl U8COSet {
     /// The result is always `<= query.len()`.
     #[inline]
     pub fn covered_len_of(&self, query: U8CO) -> u8 {
-        self.intersections(query).map(|iv| iv.len()).sum()
+        self.intersection_with_interval(query)
+            .iter_intervals()
+            .map(|iv| iv.len())
+            .sum()
     }
 
     /// Returns the uncovered length inside `query`.
