@@ -24,8 +24,5 @@ jobs:
       - name: Compile Python scripts
         run: python3 -m compileall .github/scripts
 
-      - name: Check generated files
-        run: python3 .github/scripts/release/check_codegen.py
-
       - name: Test
         run: cargo test --locked

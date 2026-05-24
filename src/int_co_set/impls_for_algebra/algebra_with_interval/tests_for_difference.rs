@@ -1,0 +1,172 @@
+use proptest::prelude::*;
+
+use crate::{
+    I8COSet,
+    int_co_set::test_support::{arb_iv, build, iv},
+};
+
+#[test]
+fn difference_of_empty_set_is_empty() {
+    let set = build([]);
+    let query = iv(-10, 10);
+
+    assert!(set.difference_with_interval(query).is_empty());
+}
+
+#[test]
+fn difference_with_disjoint_query_returns_same_set() {
+    let set = build([(-30, -20), (10, 20)]);
+    let query = iv(-10, 10);
+
+    assert_eq!(set.difference_with_interval(query), set);
+}
+
+#[test]
+fn difference_with_adjacent_query_returns_same_set() {
+    let set = build([(-20, -10), (10, 20)]);
+
+    assert_eq!(set.difference_with_interval(iv(-30, -20)), set);
+    assert_eq!(set.difference_with_interval(iv(-10, 10)), set);
+    assert_eq!(set.difference_with_interval(iv(20, 30)), set);
+}
+
+#[test]
+fn difference_removes_fully_covered_interval() {
+    let set = build([(-40, -30), (-20, -10), (10, 20)]);
+    let query = iv(-25, -5);
+
+    assert_eq!(
+        set.difference_with_interval(query).as_slice(),
+        &[iv(-40, -30), iv(10, 20)]
+    );
+}
+
+#[test]
+fn difference_clips_left_side_of_intersecting_interval() {
+    let set = build([(-10, 10), (20, 30)]);
+    let query = iv(-20, 0);
+
+    assert_eq!(
+        set.difference_with_interval(query).as_slice(),
+        &[iv(0, 10), iv(20, 30)]
+    );
+}
+
+#[test]
+fn difference_clips_right_side_of_intersecting_interval() {
+    let set = build([(-10, 10), (20, 30)]);
+    let query = iv(0, 20);
+
+    assert_eq!(
+        set.difference_with_interval(query).as_slice(),
+        &[iv(-10, 0), iv(20, 30)]
+    );
+}
+
+#[test]
+fn difference_splits_single_interval_when_query_is_inside() {
+    let set = build([(-20, 20)]);
+    let query = iv(-5, 5);
+
+    assert_eq!(
+        set.difference_with_interval(query).as_slice(),
+        &[iv(-20, -5), iv(5, 20)]
+    );
+}
+
+#[test]
+fn difference_removes_middle_hits_and_clips_boundary_hits() {
+    let set = build([(-40, -30), (-20, -10), (0, 10), (20, 30)]);
+    let query = iv(-35, 25);
+
+    assert_eq!(
+        set.difference_with_interval(query).as_slice(),
+        &[iv(-40, -35), iv(25, 30)]
+    );
+}
+
+#[test]
+fn difference_removes_everything_when_query_contains_set() {
+    let set = build([(-40, -30), (-10, 10), (30, 40)]);
+    let query = iv(-50, 50);
+
+    assert!(set.difference_with_interval(query).is_empty());
+}
+
+#[test]
+fn difference_uses_canonical_source_intervals() {
+    let set = build([(-20, -10), (-10, 0), (5, 15), (10, 20)]);
+    let query = iv(-5, 10);
+
+    assert_eq!(set.as_slice(), &[iv(-20, 0), iv(5, 20)]);
+    assert_eq!(
+        set.difference_with_interval(query).as_slice(),
+        &[iv(-20, -5), iv(10, 20)]
+    );
+}
+
+#[test]
+fn difference_handles_domain_edges() {
+    let set = build([(i8::MIN, i8::MIN + 10), (i8::MAX - 10, i8::MAX)]);
+
+    assert_eq!(
+        set.difference_with_interval(iv(i8::MIN, i8::MIN + 5))
+            .as_slice(),
+        &[iv(i8::MIN + 5, i8::MIN + 10), iv(i8::MAX - 10, i8::MAX)]
+    );
+
+    assert_eq!(
+        set.difference_with_interval(iv(i8::MAX - 5, i8::MAX))
+            .as_slice(),
+        &[iv(i8::MIN, i8::MIN + 10), iv(i8::MAX - 10, i8::MAX - 5)]
+    );
+}
+
+proptest! {
+    #[test]
+    fn prop_difference_matches_pointwise_reference_model(
+        xs in prop::collection::vec(arb_iv(), 0..64),
+        query in arb_iv(),
+    ) {
+        let set: I8COSet = xs.into_iter().collect();
+
+        let expected: I8COSet = set
+            .iter_intervals()
+            .flat_map(|interval| match interval.difference(query) {
+                int_interval::ZeroOneTwo::Zero => Vec::new(),
+                int_interval::ZeroOneTwo::One(x) => vec![x],
+                int_interval::ZeroOneTwo::Two(x, y) => vec![x, y],
+            })
+            .collect();
+
+        prop_assert_eq!(set.difference_with_interval(query), expected);
+    }
+
+    #[test]
+    fn prop_difference_results_do_not_intersect_query(
+        xs in prop::collection::vec(arb_iv(), 0..64),
+        query in arb_iv(),
+    ) {
+        let set: I8COSet = xs.into_iter().collect();
+        let result = set.difference_with_interval(query);
+
+        for interval in result.iter_intervals() {
+            prop_assert!(!interval.intersects(query));
+        }
+    }
+
+    #[test]
+    fn prop_difference_preserves_points_outside_query(
+        xs in prop::collection::vec(arb_iv(), 0..64),
+        query in arb_iv(),
+        x in any::<i8>(),
+    ) {
+        let set: I8COSet = xs.into_iter().collect();
+        let result = set.difference_with_interval(query);
+
+        prop_assert_eq!(
+            result.contains_point(x),
+            set.contains_point(x) && !query.contains(x)
+        );
+    }
+}

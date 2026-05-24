@@ -1,0 +1,44 @@
+use int_interval::traits::IntPrimitive;
+
+use super::*;
+
+impl<I: IntCO> IntCOSet<I> {
+    /// Returns the covered length inside `query`.
+    ///
+    /// Since `IntCOSet<I>` is canonical, all intersection segments are
+    /// disjoint, so summing their lengths is valid.
+    ///
+    /// The result is always `<= query.len()`.
+    #[inline]
+    pub fn covered_len_of(&self, query: I) -> I::MeasureType {
+        self.intersection_with_interval(query)
+            .iter_intervals()
+            .map(|iv| iv.len())
+            .sum()
+    }
+
+    /// Returns the uncovered length inside `query`.
+    #[inline]
+    pub fn uncovered_len_of(&self, query: I) -> I::MeasureType {
+        query.len() - self.covered_len_of(query)
+    }
+
+    /// Returns `covered_len(query) / query.len()` as `f32`.
+    ///
+    /// `query.len()` is non-zero because `I` cannot represent an empty interval.
+    #[inline]
+    pub fn coverage_ratio_f32_of(&self, query: I) -> f32 {
+        self.covered_len_of(query).as_f32() / query.len().as_f32()
+    }
+
+    /// Returns `covered_len(query) / query.len()` as `f64`.
+    ///
+    /// `query.len()` is non-zero because `I` cannot represent an empty interval.
+    #[inline]
+    pub fn coverage_ratio_f64_of(&self, query: I) -> f64 {
+        self.covered_len_of(query).as_f64() / query.len().as_f64()
+    }
+}
+
+#[cfg(test)]
+mod tests;
