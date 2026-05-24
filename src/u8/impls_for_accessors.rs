@@ -2,12 +2,9 @@ use super::*;
 
 impl U8COSet {
     /// Returns the number of canonical intervals.
-    ///
-    /// For the `U8CO` domain, the maximum canonical interval count is
-    /// 128, e.g. `[0, 1), [2, 3), ..., [254, 255)`.
     #[inline]
-    pub fn interval_count(&self) -> u8 {
-        self.intervals.len() as u8
+    pub fn interval_count(&self) -> usize {
+        self.intervals.len()
     }
 
     /// Returns whether the set contains no intervals.

@@ -99,11 +99,11 @@ fn symmetric_difference_handles_domain_edges() {
 #[test]
 fn symmetric_difference_retains_query_tail_when_query_contains_source_interval() {
     let set = build([(0, 15)]);
-    let query = iv(0, 192);
+    let query = iv(0, 127);
 
     assert_eq!(
         set.symmetric_difference_with_interval(query).as_slice(),
-        &[iv(15, 192)]
+        &[iv(15, 127)]
     );
 }
 

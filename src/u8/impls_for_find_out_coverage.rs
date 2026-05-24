@@ -8,17 +8,17 @@ impl U8COSet {
     ///
     /// The result is always `<= query.len()`.
     #[inline]
-    pub fn covered_len_of(&self, query: U8CO) -> u8 {
+    pub fn covered_len_of(&self, query: U8CO) -> usize {
         self.intersection_with_interval(query)
             .iter_intervals()
-            .map(|iv| iv.len())
+            .map(|iv| iv.len() as usize)
             .sum()
     }
 
     /// Returns the uncovered length inside `query`.
     #[inline]
-    pub fn uncovered_len_of(&self, query: U8CO) -> u8 {
-        query.len() - self.covered_len_of(query)
+    pub fn uncovered_len_of(&self, query: U8CO) -> usize {
+        query.len() as usize - self.covered_len_of(query)
     }
 
     /// Returns `covered_len(query) / query.len()` as `f32`.

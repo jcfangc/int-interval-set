@@ -11,7 +11,7 @@ fn empty_set_has_zero_covered_len() {
     let query = iv(10, 20);
 
     assert_eq!(set.covered_len_of(query), 0);
-    assert_eq!(set.uncovered_len_of(query), query.len());
+    assert_eq!(set.uncovered_len_of(query), query.len() as usize);
     assert_eq!(set.coverage_ratio_of(query), 0.0);
 }
 
@@ -41,7 +41,7 @@ fn gap_only_query_has_zero_covered_len() {
     let query = iv(20, 30);
 
     assert_eq!(set.covered_len_of(query), 0);
-    assert_eq!(set.uncovered_len_of(query), query.len());
+    assert_eq!(set.uncovered_len_of(query), query.len() as usize);
     assert_eq!(set.coverage_ratio_of(query), 0.0);
 }
 
@@ -115,7 +115,7 @@ fn representative_queries_partition_into_covered_and_uncovered_lengths() {
     ] {
         assert_eq!(
             set.covered_len_of(query) + set.uncovered_len_of(query),
-            query.len(),
+            query.len() as usize,
             "query = {query:?}"
         );
     }
@@ -151,7 +151,7 @@ proptest! {
 
         prop_assert_eq!(
             set.covered_len_of(query) + set.uncovered_len_of(query),
-            query.len()
+            query.len() as usize
         );
     }
 
@@ -175,7 +175,7 @@ proptest! {
     ) {
         let set: U8COSet = xs.into_iter().collect();
 
-        let expected = set.covered_len_of(query) as f32 / query.len() as f32;
+        let expected = set.covered_len_of(query) as f32 / query.len() as usize as f32;
 
         prop_assert_eq!(set.coverage_ratio_of(query), expected);
     }
@@ -187,7 +187,7 @@ proptest! {
     ) {
         let set: U8COSet = xs.into_iter().collect();
 
-        let expected: u8 = set.intersection_with_interval(query).iter_intervals().map(|iv| iv.len()).sum();
+        let expected: usize = set.intersection_with_interval(query).iter_intervals().map(|iv| iv.len() as usize).sum();
 
         prop_assert_eq!(set.covered_len_of(query), expected);
     }
