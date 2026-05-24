@@ -9,14 +9,6 @@ repos:
         always_run: true
         stages: [pre-commit]
 
-      - id: cargo-codegen-check
-        name: cargo codegen check
-        entry: bash -lc 'cargo run -p codegen -- --unsigned --check && cargo run -p codegen -- --signed --check'
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages: [pre-commit]
-
       - id: cargo-test
         name: cargo test
         entry: bash -lc 'cargo test --locked'

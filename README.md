@@ -1,39 +1,32 @@
-
 # int-interval-set
 
-`int-interval-set` provides canonical interval-set containers for integer half-open intervals.
+`int-interval-set` provides immutable canonical interval-set containers for
+integer half-open intervals.
 
-It is designed around a two-phase model:
+The crate is built around a single generic set type:
 
-```text
-build phase:
-  concurrent inserts into a skip list
-
-seal phase:
-  sorted scan + merge
-
-query phase:
-  immutable canonical array
+```rust
+IntCOSet<I>
 ```
 
-The core idea is:
+where:
 
-```text
-SkipList for concurrent writes.
-Arc<[Interval]> for fast read-only queries.
+```rust
+I: IntCO
 ```
 
-## Features
+Concrete interval-set types such as `U8COSet` and `I32COSet` are now simple
+type aliases.
 
-* Supports integer closed-open intervals such as `[start, end_excl)`.
-* Builds interval sets from `int-interval` interval types.
-* Uses `crossbeam-skiplist` during the write phase.
-* Produces immutable canonical interval sets after `seal()`.
-* Query APIs are backed by binary search over compact arrays.
-* Supports unsigned and signed integer interval-set types through code generation.
-* Generated files are checked in and verified by codegen check mode.
+The library no longer uses builders, concurrent mutable phases, or generated
+set implementations.
 
-## Interval semantics
+Instead, interval sets are constructed directly from iterators and immediately
+canonicalized into compact immutable arrays.
+
+---
+
+# Interval semantics
 
 All intervals are half-open:
 
@@ -59,7 +52,9 @@ but does not contain:
 20
 ```
 
-Adjacent intervals are merged during sealing:
+Intervals are canonicalized automatically during construction.
+
+Adjacent intervals are merged:
 
 ```text
 [0, 5) + [5, 10) -> [0, 10)
@@ -71,25 +66,43 @@ Overlapping intervals are also merged:
 [10, 20) + [15, 30) -> [10, 30)
 ```
 
-The sealed set is canonical:
+The canonical invariant is:
 
 ```text
 for every adjacent pair a, b:
     a.end_excl() < b.start()
 ```
 
-That means sealed intervals are:
+This means canonical interval sets are:
 
-* sorted;
-* non-overlapping;
-* non-adjacent;
-* already merged.
+- sorted;
+- non-overlapping;
+- non-adjacent;
+- already merged.
 
-## Supported types
+---
 
-The crate is generated from hand-maintained templates.
+# Core type
 
-Unsigned types:
+```rust
+pub struct IntCOSet<I: IntCO>
+```
+
+Internally:
+
+```rust
+Arc<[I]>
+```
+
+is used as the immutable storage representation.
+
+Cloning a set is therefore cheap.
+
+---
+
+# Provided aliases
+
+Unsigned:
 
 ```rust
 U8COSet
@@ -100,7 +113,7 @@ U128COSet
 UsizeCOSet
 ```
 
-Signed types:
+Signed:
 
 ```rust
 I8COSet
@@ -111,29 +124,31 @@ I128COSet
 IsizeCOSet
 ```
 
-Each type has a corresponding builder:
+These are aliases only:
 
 ```rust
-U8COSetBuilder
-U16COSetBuilder
-I8COSetBuilder
-I16COSetBuilder
-// ...
+pub type U8COSet = IntCOSet<U8CO>;
 ```
 
-## Basic usage
+---
+
+# Construction
+
+Interval sets are usually constructed through `FromIterator`.
+
+Example:
 
 ```rust
 use int_interval::U8CO;
-use int_interval_set::U8COSetBuilder;
+use int_interval_set::U8COSet;
 
-let builder = U8COSetBuilder::new();
-
-builder.insert(U8CO::try_new(10, 20).unwrap());
-builder.insert(U8CO::try_new(15, 30).unwrap());
-builder.insert(U8CO::try_new(40, 50).unwrap());
-
-let set = builder.seal();
+let set: U8COSet = [
+    U8CO::try_new(10, 20).unwrap(),
+    U8CO::try_new(15, 30).unwrap(),
+    U8CO::try_new(40, 50).unwrap(),
+]
+.into_iter()
+.collect();
 
 assert_eq!(
     set.as_slice(),
@@ -142,43 +157,31 @@ assert_eq!(
         U8CO::try_new(40, 50).unwrap(),
     ]
 );
-
-assert!(set.contains_point(18));
-assert!(!set.contains_point(30));
 ```
 
-## Concurrent build phase
-
-Builders accept shared-reference inserts:
+Parallel construction is also supported through Rayon:
 
 ```rust
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use int_interval::U8CO;
-use int_interval_set::U8COSetBuilder;
+use int_interval_set::U8COSet;
 
-let builder = U8COSetBuilder::new();
+let set: U8COSet = vec![
+    U8CO::try_new(0, 10).unwrap(),
+    U8CO::try_new(10, 20).unwrap(),
+]
+.into_par_iter()
+.collect();
 
-std::thread::scope(|s| {
-    let b = &builder;
-    s.spawn(move || {
-        b.insert(U8CO::try_new(0, 10).unwrap());
-    });
-
-    let b = &builder;
-    s.spawn(move || {
-        b.insert(U8CO::try_new(10, 20).unwrap());
-    });
-});
-
-let set = builder.seal();
-
-assert_eq!(set.as_slice(), &[U8CO::try_new(0, 20).unwrap()]);
+assert_eq!(
+    set.as_slice(),
+    &[U8CO::try_new(0, 20).unwrap()]
+);
 ```
 
-`seal()` consumes the builder. After sealing, the set is immutable and cheap to clone.
+---
 
-## Query APIs
-
-### Basic accessors
+# Basic accessors
 
 ```rust
 set.interval_count();
@@ -187,9 +190,21 @@ set.as_slice();
 set.iter_intervals();
 ```
 
-### Predicate APIs
+Example:
 
-Predicate APIs answer yes-or-no questions:
+```rust
+assert_eq!(set.interval_count(), 2);
+
+for interval in set.iter_intervals() {
+    println!("{interval:?}");
+}
+```
+
+---
+
+# Predicate APIs
+
+Predicate APIs answer yes-or-no questions.
 
 ```rust
 set.contains_point(x);
@@ -200,171 +215,239 @@ set.intersects_interval(query);
 Example:
 
 ```rust
+use int_interval::U8CO;
+
 let query = U8CO::try_new(15, 25).unwrap();
 
 assert!(set.intersects_interval(query));
+assert!(!set.contains_interval(query));
 ```
 
-### Search APIs
+---
 
-Search APIs return matching intervals.
+# Search APIs
 
-Find the unique interval containing a point:
+## Find interval containing a point
 
 ```rust
 let hit = set.interval_containing_point(18);
 ```
 
-Return all stored intervals intersecting a query:
+Because sets are canonical, at most one interval can contain a point.
+
+---
+
+## Iterate intersecting intervals
 
 ```rust
 let hits: Vec<_> = set
-    .intervals_intersecting(U8CO::try_new(15, 45).unwrap())
+    .intervals_intersecting(
+        U8CO::try_new(15, 45).unwrap()
+    )
     .collect();
 ```
 
-Return clipped intersection segments:
-
-```rust
-let intersections: Vec<_> = set
-    .intersections(U8CO::try_new(15, 45).unwrap())
-    .collect();
-```
-
-For example:
+Example:
 
 ```text
 set:   [10, 20), [30, 40)
 query: [15, 35)
 
-intervals_intersecting:
+out:
   [10, 20), [30, 40)
-
-intersections:
-  [15, 20), [30, 35)
 ```
 
-### Coverage APIs
+---
 
-Coverage APIs compute how much of a query interval is covered by the set:
+# Interval-vs-set algebra
+
+## Intersection
 
 ```rust
-set.covered_len(query);
-set.uncovered_len(query);
-set.coverage_ratio(query);
+set.intersection_with_interval(query);
 ```
 
 Example:
 
+```text
+set:   [10, 20), [30, 40)
+query: [15, 35)
+
+out:
+  [15, 20), [30, 35)
+```
+
+---
+
+## Union
+
 ```rust
-use int_interval::U8CO;
-use int_interval_set::U8COSetBuilder;
-
-let builder = U8COSetBuilder::new();
-
-builder.insert(U8CO::try_new(10, 20).unwrap());
-builder.insert(U8CO::try_new(30, 40).unwrap());
-
-let set = builder.seal();
-let query = U8CO::try_new(15, 35).unwrap();
-
-assert_eq!(set.covered_len(query), 10);
-assert_eq!(set.uncovered_len(query), 10);
-assert_eq!(set.coverage_ratio(query), 0.5);
+set.union_with_interval(query);
 ```
 
-## Complexity
-
-Let `n` be the number of raw inserted intervals, and `m` be the number of canonical intervals after sealing.
-
-| Operation                       |                             Complexity |
-| ------------------------------- | -------------------------------------: |
-| `builder.insert(interval)`      |                    expected `O(log n)` |
-| `builder.seal()`                | `O(n)` over sorted skip-list iteration |
-| `contains_point(x)`             |                             `O(log m)` |
-| `contains_interval(query)`      |                             `O(log m)` |
-| `intersects_interval(query)`    |                             `O(log m)` |
-| `intervals_intersecting(query)` |                         `O(log m + k)` |
-| `intersections(query)`          |                         `O(log m + k)` |
-| `covered_len(query)`            |                         `O(log m + k)` |
-
-`k` is the number of matched intervals.
-
-## Why not query the skip list directly?
-
-The builder stores raw intervals. Raw intervals may overlap:
+Example:
 
 ```text
-[0, 100)
-[50, 60)
+set:   [10, 20), [30, 40)
+query: [20, 30)
+
+out:
+  [10, 40)
 ```
 
-A direct predecessor-based query on raw intervals can be wrong unless the set is already canonical.
+---
 
-After sealing, the structure becomes:
+## Difference
+
+```rust
+set.difference_with_interval(query);
+```
+
+Example:
 
 ```text
-[0, 100)
+set:   [10, 20), [30, 40), [50, 60)
+query: [15, 55)
+
+out:
+  [10, 15), [55, 60)
 ```
 
-This makes binary-search-based queries simple, correct, and cache-friendly.
+---
 
-## Design notes
+## Symmetric difference
 
-The crate deliberately avoids doing interval merging during concurrent insertion.
+```rust
+set.symmetric_difference_with_interval(query);
+```
 
-Merging during insert would require a multi-node operation:
+Example:
 
 ```text
-find neighbors
-delete old intervals
-insert merged interval
-handle races
+set:   [10, 20), [30, 40)
+query: [15, 35)
+
+out:
+  [10, 15), [20, 30), [35, 40)
 ```
 
-That turns the operation into a small transaction over a concurrent ordered set.
+---
 
-Instead, this crate uses a simpler and safer model:
+# Set-vs-set algebra
+
+## Intersection
+
+```rust
+left.intersection_with_set(&right);
+```
+
+---
+
+## Union
+
+```rust
+left.union_with_set(&right);
+```
+
+---
+
+## Difference
+
+```rust
+left.difference_with_set(&right);
+```
+
+---
+
+## Symmetric difference
+
+```rust
+left.symmetric_difference_with_set(&right);
+```
+
+Example:
 
 ```text
-insert raw intervals concurrently
-seal once
-query immutable canonical set
+left:  [0, 10), [20, 30)
+right: [5, 15), [25, 35)
+
+xor:
+  [0, 5), [10, 15), [20, 25), [30, 35)
 ```
 
-This fits build-then-query workloads well.
+---
 
-### Trade-offs
+# Coverage APIs
 
-This design is not universally optimal.
+Coverage APIs measure how much of a query interval is covered by the set.
 
-During the build phase, the builder stores raw intervals rather than canonical intervals. That means repeated, overlapping, or adjacent inserts are not compacted immediately. If many inserted intervals overlap heavily, the builder may temporarily hold significantly more entries than the final sealed set.
+```rust
+set.covered_len_of(query);
+set.uncovered_len_of(query);
 
-Queries are intentionally not provided on the builder. The raw skip-list is not canonical, so predecessor-based interval queries can be incorrect without additional indexing. Users must call `seal()` before using the efficient query APIs.
+set.coverage_ratio_f32_of(query);
+set.coverage_ratio_f64_of(query);
+```
 
-`seal()` is a required synchronization point. It consumes the builder and performs a full sorted scan to produce the immutable set. This is suitable for build-then-query workloads, but not for workloads that require continuous writes and reads at the same time.
-
-The sealed set is immutable. Updating it requires creating a new builder or constructing a new set from intervals. This avoids complicated concurrent mutation logic, but it is less convenient for online dynamic interval indexes.
-
-The write path also pays the overhead of a concurrent skip list. For small single-threaded workloads, a simple `Vec` followed by sort-and-merge may be faster and simpler. The builder is most useful when many threads insert intervals before a single seal step.
-
-In short:
+Example:
 
 ```text
-Better for:
-  concurrent build
-  one-time sealing
-  many read-only queries
+set:   [10, 20), [30, 40)
+query: [15, 35)
 
-Less suitable for:
-  continuous online updates
-  querying before seal
-  tiny single-threaded inputs
-  workloads requiring immediate canonicalization
+covered:
+  [15, 20), [30, 35)
+
+covered length:
+  10
+
+query length:
+  20
+
+coverage ratio:
+  0.5
 ```
 
+---
 
+# Complexity
 
-## License
+Most query operations are logarithmic or linear in the number of matching
+intervals.
 
-MIT OR Apache-2.0
+Representative costs:
+
+| Operation | Complexity |
+|---|---|
+| `contains_point` | `O(log n)` |
+| `contains_interval` | `O(log n)` |
+| `intersects_interval` | `O(log n)` |
+| `intervals_intersecting` | `O(log n + k)` |
+| `intersection_with_interval` | `O(log n + k)` |
+| `union_with_interval` | `O(log n + n)` |
+| `difference_with_interval` | `O(log n)` to `O(n)` |
+| `intersection_with_set` | `O(n + m)` |
+| `union_with_set` | `O(n + m)` |
+| `difference_with_set` | `O(n + m)` |
+| `symmetric_difference_with_set` | `O(n + m)` |
+
+where:
+
+```text
+n = self interval count
+m = other interval count
+k = number of matching intervals
+```
+
+---
+
+# Design goals
+
+The crate prioritizes:
+
+- immutable canonical representations;
+- predictable interval algebra;
+- low-overhead binary-search queries;
+- generic implementations over all integer interval types;
+- zero code generation;
+- simple semantics and explicit APIs.

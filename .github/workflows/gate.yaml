@@ -1,4 +1,4 @@
-name: ci
+name: gate
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: gate-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -23,9 +23,6 @@ jobs:
 
       - name: Compile Python scripts
         run: python3 -m compileall .github/scripts
-
-      - name: Check generated files
-        run: python3 .github/scripts/release/check_codegen.py
 
       - name: Test
         run: cargo test --locked
