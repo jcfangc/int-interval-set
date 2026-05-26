@@ -37,9 +37,9 @@ harness = false
 name = "contains_point"
 harness = false
 
-# [[bench]]
-# name = "contains_interval"
-# harness = false
+[[bench]]
+name = "contains_interval"
+harness = false
 
 # [[bench]]
 # name = "intersects_interval"
