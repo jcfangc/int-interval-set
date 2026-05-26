@@ -98,9 +98,9 @@ harness = false
 # name = "uncovered_len_of"
 # harness = false
 
-# [[bench]]
-# name = "coverage_ratio_f32_of"
-# harness = false
+[[bench]]
+name = "coverage_ratio_f32_of"
+harness = false
 
 # [[bench]]
 # name = "coverage_ratio_f64_of"
