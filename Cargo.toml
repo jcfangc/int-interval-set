@@ -81,9 +81,9 @@ harness = false
 name = "iter_intervals"
 harness = false
 
-# [[bench]]
-# name = "interval_containing_point"
-# harness = false
+[[bench]]
+name = "interval_containing_point"
+harness = false
 
 # [[bench]]
 # name = "intervals_intersecting"
