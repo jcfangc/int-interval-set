@@ -77,9 +77,9 @@ harness = false
 name = "symmetric_difference_with_interval"
 harness = false
 
-# [[bench]]
-# name = "iter_intervals"
-# harness = false
+[[bench]]
+name = "iter_intervals"
+harness = false
 
 # [[bench]]
 # name = "interval_containing_point"
