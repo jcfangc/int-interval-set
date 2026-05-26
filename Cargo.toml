@@ -45,9 +45,9 @@ harness = false
 name = "intersects_interval"
 harness = false
 
-# [[bench]]
-# name = "intersection_with_set"
-# harness = false
+[[bench]]
+name = "intersection_with_set"
+harness = false
 
 # [[bench]]
 # name = "union_with_set"
