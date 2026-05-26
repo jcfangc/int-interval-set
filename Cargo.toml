@@ -24,6 +24,7 @@ criterion = { version = "4.7.0", package = "codspeed-criterion-compat", features
 proptest = "1.10.0"
 range-collections = "0.4.6"
 range-set-blaze = "0.5.0"
+rangemap = "1.7.1"
 
 [lib]
 doctest = false
@@ -85,9 +86,9 @@ harness = false
 name = "interval_containing_point"
 harness = false
 
-# [[bench]]
-# name = "intervals_intersecting"
-# harness = false
+[[bench]]
+name = "intervals_intersecting"
+harness = false
 
 # [[bench]]
 # name = "covered_len_of"
