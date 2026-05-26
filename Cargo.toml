@@ -18,7 +18,90 @@ int-interval = "0.9.0"
 rayon = "1.12.0"
 
 [dev-dependencies]
+criterion = { version = "4.7.0", package = "codspeed-criterion-compat", features = [
+    "html_reports",
+] }
 proptest = "1.10.0"
+range-collections = "0.4.6"
+range-set-blaze = "0.5.0"
+rangemap = "1.7.1"
 
 [lib]
 doctest = false
+bench = false
+
+[[bench]]
+name = "construct"
+harness = false
+
+[[bench]]
+name = "contains_point"
+harness = false
+
+[[bench]]
+name = "contains_interval"
+harness = false
+
+[[bench]]
+name = "intersects_interval"
+harness = false
+
+[[bench]]
+name = "intersection_with_set"
+harness = false
+
+[[bench]]
+name = "union_with_set"
+harness = false
+
+[[bench]]
+name = "difference_with_set"
+harness = false
+
+[[bench]]
+name = "symmetric_difference_with_set"
+harness = false
+
+[[bench]]
+name = "intersection_with_interval"
+harness = false
+
+[[bench]]
+name = "union_with_interval"
+harness = false
+
+[[bench]]
+name = "difference_with_interval"
+harness = false
+
+[[bench]]
+name = "symmetric_difference_with_interval"
+harness = false
+
+[[bench]]
+name = "iter_intervals"
+harness = false
+
+[[bench]]
+name = "interval_containing_point"
+harness = false
+
+[[bench]]
+name = "intervals_intersecting"
+harness = false
+
+[[bench]]
+name = "covered_len_of"
+harness = false
+
+[[bench]]
+name = "uncovered_len_of"
+harness = false
+
+[[bench]]
+name = "coverage_ratio_f32_of"
+harness = false
+
+[[bench]]
+name = "coverage_ratio_f64_of"
+harness = false
