@@ -94,14 +94,14 @@ harness = false
 name = "covered_len_of"
 harness = false
 
-# [[bench]]
-# name = "uncovered_len_of"
-# harness = false
+[[bench]]
+name = "uncovered_len_of"
+harness = false
 
 [[bench]]
 name = "coverage_ratio_f32_of"
 harness = false
 
-# [[bench]]
-# name = "coverage_ratio_f64_of"
-# harness = false
+[[bench]]
+name = "coverage_ratio_f64_of"
+harness = false
