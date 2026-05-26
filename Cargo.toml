@@ -57,9 +57,9 @@ harness = false
 name = "difference_with_set"
 harness = false
 
-# [[bench]]
-# name = "symmetric_difference_with_set"
-# harness = false
+[[bench]]
+name = "symmetric_difference_with_set"
+harness = false
 
 # [[bench]]
 # name = "intersection_with_interval"
