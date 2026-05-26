@@ -33,9 +33,9 @@ bench = false
 name = "construct"
 harness = false
 
-# [[bench]]
-# name = "contains_point"
-# harness = false
+[[bench]]
+name = "contains_point"
+harness = false
 
 # [[bench]]
 # name = "contains_interval"
