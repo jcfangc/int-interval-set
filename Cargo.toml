@@ -90,9 +90,9 @@ harness = false
 name = "intervals_intersecting"
 harness = false
 
-# [[bench]]
-# name = "covered_len_of"
-# harness = false
+[[bench]]
+name = "covered_len_of"
+harness = false
 
 # [[bench]]
 # name = "uncovered_len_of"
