@@ -1,5 +1,11 @@
 # int-interval-set
 
+[![Crates.io](https://img.shields.io/crates/v/int-interval-set.svg)](https://crates.io/crates/int-interval-set)
+[![Documentation](https://docs.rs/int-interval-set/badge.svg)](https://docs.rs/int-interval-set)
+[![License](https://img.shields.io/crates/l/int-interval-set.svg)](https://crates.io/crates/int-interval-set)
+[![CodSpeed](https://github.com/jcfangc/int-interval-set/actions/workflows/codspeed.yml/badge.svg?branch=main)](https://github.com/jcfangc/int-interval-set/actions/workflows/codspeed.yml)
+
+
 `int-interval-set` provides immutable canonical interval-set containers for
 integer half-open intervals.
 
