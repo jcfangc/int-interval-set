@@ -1,4 +1,4 @@
-use criterion::{Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use int_interval::I32CO;
 use int_interval_set::I32COSet;
 use range_collections::RangeSet2;
@@ -20,7 +20,7 @@ const CASES: &[(&str, Bounds)] = &[
     ("clip_middle_span", (16 * STRIDE + 2, 48 * STRIDE + 2)),
 ];
 
-/// [0, 4), [8, 12), ..., [504, 508)。
+/// Produces `[0, 4), [8, 12), ..., [504, 508)`.
 fn set_bounds() -> Vec<Bounds> {
     (0..N)
         .map(|i| {
@@ -67,23 +67,23 @@ fn bench_difference_with_interval(c: &mut Criterion) {
     for &(case, (start, end_excl)) in CASES {
         let query = I32CO::try_new(start, end_excl).unwrap();
 
-        // 两个对照库没有专门的 half-open interval difference 入口；
-        // 将单区间操作数提前构造成 singleton set，不计入测量。
+        // Comparator libraries do not expose a dedicated half-open interval
+        // difference entry point, so the query is prebuilt as a singleton set.
         let blaze_query = RangeSetBlaze::from(start..=(end_excl - 1));
         let collections_query = RangeSet2::from(start..end_excl);
 
-        let mut group = c.benchmark_group(format!("difference_with_interval/{case}"));
+        let mut group = c.benchmark_group("difference_with_interval");
         group.throughput(Throughput::Elements(bounds.len() as u64));
 
-        group.bench_function("int_interval_set", |b| {
+        group.bench_function(BenchmarkId::new("int_interval_set", case), |b| {
             b.iter(|| black_box(&int_interval_set).difference_with_interval(black_box(query)))
         });
 
-        group.bench_function("range_set_blaze", |b| {
+        group.bench_function(BenchmarkId::new("range_set_blaze", case), |b| {
             b.iter(|| black_box(&range_set_blaze) - black_box(&blaze_query))
         });
 
-        group.bench_function("range_collections", |b| {
+        group.bench_function(BenchmarkId::new("range_collections", case), |b| {
             b.iter(|| black_box(&range_collections) - black_box(&collections_query))
         });
 

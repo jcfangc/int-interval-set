@@ -1,4 +1,4 @@
-use criterion::{Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use int_interval::I32CO;
 use int_interval_set::I32COSet;
 use range_collections::{RangeSet, RangeSet2};
@@ -107,21 +107,21 @@ fn bench_case(c: &mut Criterion, case: &str, rhs_bounds: &[Bounds]) {
     let collections_lhs = range_collections(&lhs_bounds);
     let collections_rhs = range_collections(rhs_bounds);
 
-    let mut group = c.benchmark_group(format!("difference_with_set/{case}"));
+    let mut group = c.benchmark_group("difference_with_set");
 
     group.throughput(Throughput::Elements(
         (lhs_bounds.len() + rhs_bounds.len()) as u64,
     ));
 
-    group.bench_function("int_interval_set", |b| {
+    group.bench_function(BenchmarkId::new("int_interval_set", case), |b| {
         b.iter(|| black_box(black_box(&int_lhs).difference_with_set(black_box(&int_rhs))));
     });
 
-    group.bench_function("range_set_blaze", |b| {
+    group.bench_function(BenchmarkId::new("range_set_blaze", case), |b| {
         b.iter(|| black_box(black_box(&blaze_lhs) - black_box(&blaze_rhs)));
     });
 
-    group.bench_function("range_collections", |b| {
+    group.bench_function(BenchmarkId::new("range_collections", case), |b| {
         b.iter(|| {
             black_box(
                 black_box(&collections_lhs).difference::<[i32; 2]>(black_box(&collections_rhs)),

@@ -1,0 +1,76 @@
+name: Benchmark Pages
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: benchmark-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Criterion report
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run Criterion benchmarks
+        env:
+          BENCH_PROFILE: report
+        run: |
+          rm -rf target/criterion
+          cargo bench
+
+      - name: Render Plotly comparison report
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install plotly
+          python3 .github/scripts/bench/render_criterion_plotly.py
+
+      - name: Prepare Pages site
+        run: |
+          set -euo pipefail
+
+          test -f target/criterion/index.html
+          test -f target/criterion/.nojekyll
+          test -f target/criterion/report/index.html
+          test -f target/criterion/compare-plotly/index.html
+
+          find target/criterion -maxdepth 3 -type f | sort | sed -n '1,120p'
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: target/criterion
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

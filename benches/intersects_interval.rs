@@ -1,4 +1,4 @@
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use int_interval::I32CO;
 use int_interval_set::I32COSet;
 use range_collections::range_set::{RangeSet, RangeSet2};
@@ -65,7 +65,7 @@ fn bench_case(
     range_set_blaze: &RangeSetBlaze<i32>,
     range_collections: &RangeSet2<i32>,
 ) {
-    let mut group = c.benchmark_group(format!("intersects_interval/{case}"));
+    let mut group = c.benchmark_group("intersects_interval");
     let (start, end_excl) = query;
 
     let int_interval_query = I32CO::try_new(start, end_excl).unwrap();
@@ -74,15 +74,15 @@ fn bench_case(
 
     let range_collections_query: RangeSet2<i32> = RangeSet::from(start..end_excl);
 
-    group.bench_function("int_interval_set", |b| {
+    group.bench_function(BenchmarkId::new("int_interval_set", case), |b| {
         b.iter(|| black_box(int_interval_set).intersects_interval(black_box(int_interval_query)));
     });
 
-    group.bench_function("range_set_blaze", |b| {
+    group.bench_function(BenchmarkId::new("range_set_blaze", case), |b| {
         b.iter(|| !black_box(range_set_blaze).is_disjoint(black_box(&range_set_blaze_query)));
     });
 
-    group.bench_function("range_collections", |b| {
+    group.bench_function(BenchmarkId::new("range_collections", case), |b| {
         b.iter(|| black_box(range_collections).intersects(black_box(&range_collections_query)));
     });
 
