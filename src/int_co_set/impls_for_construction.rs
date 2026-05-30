@@ -31,6 +31,14 @@ impl<I: IntCO> IntCOSet<I> {
     }
 }
 
+impl<I: IntCO> Default for IntCOSet<I> {
+    fn default() -> Self {
+        Self {
+            intervals: Arc::new([]),
+        }
+    }
+}
+
 impl<I: IntCO> FromIterator<I> for IntCOSet<I> {
     fn from_iter<T>(iter: T) -> Self
     where

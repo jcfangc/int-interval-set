@@ -177,9 +177,17 @@ impl<I: IntCO> IntCOSet<I> {
     /// The returned set contains every point covered by exactly one of the two
     /// input sets.
     ///
-    /// Both source sets are canonical. Their ordered boundary events are scanned
-    /// together while tracking whether each side currently covers the sweep
-    /// position.
+    /// Both source sets are canonical. This method performs a two-way sweep over
+    /// their virtual boundary events while tracking whether each side currently
+    /// covers the sweep position.
+    ///
+    /// Unlike an event-materializing implementation, the boundary event stream is
+    /// represented by interval indices plus per-side coverage states:
+    ///
+    /// - if a side is currently outside its current interval, the next event is
+    ///   that interval's start;
+    /// - if a side is currently inside its current interval, the next event is
+    ///   that interval's exclusive end.
     ///
     /// Example:
     ///
@@ -196,68 +204,119 @@ impl<I: IntCO> IntCOSet<I> {
         if self.is_empty() {
             return other.clone();
         }
-
         if other.is_empty() {
             return self.clone();
         }
 
-        // Each stream is already sorted because each source set is canonical:
-        //
-        // [start_0, end_0), [start_1, end_1), ...
-        //  -> start_0, end_0, start_1, end_1, ...
-        let mut left_events = self
-            .intervals
-            .iter()
-            .copied()
-            .flat_map(|iv| [(iv.start(), true), (iv.end_excl(), false)])
-            .peekable();
+        // A set has an empty symmetric difference with itself. This also avoids
+        // scanning the same backing interval slice twice for the common self/self
+        // case.
+        if core::ptr::eq(self, other) {
+            return Self::default();
+        }
 
-        let mut right_events = other
-            .intervals
-            .iter()
-            .copied()
-            .flat_map(|iv| [(iv.start(), true), (iv.end_excl(), false)])
-            .peekable();
+        let left: &[I] = self.intervals.as_ref();
+        let right: &[I] = other.intervals.as_ref();
+
+        // `li` and `ri` point to the current interval of each side.
+        //
+        // A side advances its index only after processing the current interval's
+        // end event. Its start event only flips the coverage state to `true`.
+        let mut li = 0usize;
+        let mut ri = 0usize;
 
         let mut left_covered = false;
         let mut right_covered = false;
+
+        // Start coordinate of the currently open XOR-covered output interval.
         let mut opened_at = None;
 
-        let mut intervals = Vec::with_capacity(self.intervals.len() + other.intervals.len());
+        // The symmetric difference of two canonical sets contains at most `n + m`
+        // canonical intervals.
+        let mut intervals = Vec::with_capacity(left.len() + right.len());
 
-        while left_events.peek().is_some() || right_events.peek().is_some() {
-            // Next boundary coordinate from either source.
-            let x = match (left_events.peek(), right_events.peek()) {
-                (Some((left_x, _)), Some((right_x, _))) => (*left_x).min(*right_x),
-                (Some((left_x, _)), None) => *left_x,
-                (None, Some((right_x, _))) => *right_x,
+        while li < left.len() || ri < right.len() {
+            // Compute the next virtual boundary coordinate from each side.
+            //
+            // If the side is outside its current interval, the next boundary is
+            // `start`; if it is inside, the next boundary is `end_excl`.
+            let left_x = left.get(li).copied().map(|iv| {
+                if left_covered {
+                    iv.end_excl()
+                } else {
+                    iv.start()
+                }
+            });
+
+            let right_x = right.get(ri).copied().map(|iv| {
+                if right_covered {
+                    iv.end_excl()
+                } else {
+                    iv.start()
+                }
+            });
+
+            // Advance to the earliest pending boundary coordinate.
+            let x = match (left_x, right_x) {
+                (Some(a), Some(b)) => a.min(b),
+                (Some(a), None) => a,
+                (None, Some(b)) => b,
                 (None, None) => unreachable!(),
             };
 
-            let covered_and_only_one_side_covered_before = left_covered ^ right_covered;
+            let before = left_covered ^ right_covered;
 
-            // Process every boundary at `x` before evaluating the new XOR state.
-            // This preserves canonical output when one set ends exactly where the
-            // other begins.
-            while left_events.peek().is_some_and(|(event_x, _)| *event_x == x) {
-                let (_, starts) = left_events.next().unwrap();
-                left_covered = starts;
+            // Process all left-side boundary events at `x`.
+            //
+            // For a canonical non-empty interval, its start and end cannot both be
+            // at the same coordinate. Therefore one loop iteration flips either
+            // outside -> inside or inside -> outside. The index advances only when
+            // leaving the interval.
+            while let Some(iv) = left.get(li).copied() {
+                let event_x = if left_covered {
+                    iv.end_excl()
+                } else {
+                    iv.start()
+                };
+
+                if event_x != x {
+                    break;
+                }
+
+                if left_covered {
+                    left_covered = false;
+                    li += 1;
+                } else {
+                    left_covered = true;
+                }
             }
 
-            while right_events
-                .peek()
-                .is_some_and(|(event_x, _)| *event_x == x)
-            {
-                let (_, starts) = right_events.next().unwrap();
-                right_covered = starts;
+            // Process all right-side boundary events at the same coordinate before
+            // observing the new XOR state. Grouping equal-coordinate events keeps
+            // the output canonical when one side ends exactly where the other side
+            // starts.
+            while let Some(iv) = right.get(ri).copied() {
+                let event_x = if right_covered {
+                    iv.end_excl()
+                } else {
+                    iv.start()
+                };
+
+                if event_x != x {
+                    break;
+                }
+
+                if right_covered {
+                    right_covered = false;
+                    ri += 1;
+                } else {
+                    right_covered = true;
+                }
             }
 
-            let covered_and_only_one_side_covered_after = left_covered ^ right_covered;
+            let after = left_covered ^ right_covered;
 
-            match (
-                covered_and_only_one_side_covered_before,
-                covered_and_only_one_side_covered_after,
-            ) {
+            match (before, after) {
                 // Enter a region covered by exactly one input set.
                 (false, true) => opened_at = Some(x),
 
@@ -267,13 +326,13 @@ impl<I: IntCO> IntCOSet<I> {
                         .take()
                         .expect("symmetric difference region must have a start");
 
-                    let interval = I::try_new(start, x)
-                        .expect("symmetric difference region must be non-empty");
-
-                    intervals.push(interval);
+                    intervals.push(
+                        I::try_new(start, x)
+                            .expect("symmetric difference region must be non-empty"),
+                    );
                 }
 
-                // Coverage parity did not change:
+                // XOR state did not change:
                 // - false -> false: remain outside the result;
                 // - true -> true: remain inside one continuous result interval.
                 _ => {}
@@ -283,13 +342,14 @@ impl<I: IntCO> IntCOSet<I> {
         debug_assert!(opened_at.is_none());
 
         // SAFETY:
-        // - Boundary coordinates are visited in ascending order.
-        // - An interval is emitted exactly when XOR coverage changes from true
-        //   to false.
-        // - Equal-coordinate boundary events are processed together, so touching
-        //   XOR-covered regions are emitted as one interval rather than adjacent
-        //   intervals.
-        // - Therefore the resulting slice is sorted, non-overlapping, and
+        // - Both input slices are canonical, so their virtual boundary events are
+        //   ordered within each side.
+        // - The sweep always consumes the smallest pending boundary coordinate.
+        // - Equal-coordinate events from both sides are processed together before
+        //   the new XOR state is evaluated.
+        // - An output interval is emitted exactly when XOR coverage changes from
+        //   true to false.
+        // - Therefore emitted intervals are sorted, non-empty, non-overlapping, and
         //   non-adjacent.
         unsafe { Self::new_unchecked(intervals) }
     }
