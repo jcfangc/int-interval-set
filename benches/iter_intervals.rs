@@ -1,4 +1,4 @@
-use criterion::{Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use int_interval::I32CO;
 use int_interval_set::I32COSet;
 use range_collections::{RangeSet, RangeSet2};
@@ -67,11 +67,11 @@ fn bench_case(c: &mut Criterion, case: &str, bounds: &[Bounds]) {
 
     let output_intervals = int_set.interval_count();
 
-    let mut group = c.benchmark_group(format!("iter_intervals/{case}"));
+    let mut group = c.benchmark_group("iter_intervals");
 
     group.throughput(Throughput::Elements(output_intervals as u64));
 
-    group.bench_function("int_interval_set", |b| {
+    group.bench_function(BenchmarkId::new("int_interval_set", case), |b| {
         b.iter(|| {
             for interval in black_box(&int_set).iter_intervals() {
                 black_box(interval);
@@ -79,7 +79,7 @@ fn bench_case(c: &mut Criterion, case: &str, bounds: &[Bounds]) {
         });
     });
 
-    group.bench_function("range_set_blaze", |b| {
+    group.bench_function(BenchmarkId::new("range_set_blaze", case), |b| {
         b.iter(|| {
             for interval in black_box(&blaze_set).ranges() {
                 black_box(interval);
@@ -87,7 +87,7 @@ fn bench_case(c: &mut Criterion, case: &str, bounds: &[Bounds]) {
         });
     });
 
-    group.bench_function("range_collections", |b| {
+    group.bench_function(BenchmarkId::new("range_collections", case), |b| {
         b.iter(|| {
             for interval in black_box(&collections_set).iter() {
                 black_box(interval);

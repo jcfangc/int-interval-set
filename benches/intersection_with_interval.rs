@@ -1,4 +1,4 @@
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use int_interval::I32CO;
 use int_interval_set::I32COSet;
 use range_collections::RangeSet2;
@@ -17,11 +17,12 @@ const CASES: &[(&str, Bounds)] = &[
     ("covers_all", (-16, 1032)),
 ];
 
-/// 64 个规范化区间：每段长度 12，段间 gap 长度 4。
-///
 /// ```text
 /// [0, 12), [16, 28), ..., [1008, 1020)
 /// ```
+/// Produces 64 canonical intervals of length 12 separated by gaps of length 4.
+///
+/// Layout: `[0, 12), [16, 28), ..., [1008, 1020)`.
 fn source_bounds() -> Vec<Bounds> {
     (0..INTERVAL_COUNT)
         .map(|i| {
@@ -67,22 +68,22 @@ fn bench_intersection_with_interval(c: &mut Criterion) {
     let collections_set = range_collections(&bounds);
 
     for &(case, (start, end_excl)) in CASES {
-        let mut group = c.benchmark_group(format!("intersection_with_interval/{case}"));
+        let mut group = c.benchmark_group("intersection_with_interval");
 
         let int_query = I32CO::try_new(start, end_excl).unwrap();
-        group.bench_function("int_interval_set", |b| {
+        group.bench_function(BenchmarkId::new("int_interval_set", case), |b| {
             b.iter(|| {
                 black_box(black_box(&int_set).intersection_with_interval(black_box(int_query)))
             });
         });
 
         let blaze_query = RangeSetBlaze::from(start..=(end_excl - 1));
-        group.bench_function("range_set_blaze", |b| {
+        group.bench_function(BenchmarkId::new("range_set_blaze", case), |b| {
             b.iter(|| black_box(black_box(&blaze_set) & black_box(&blaze_query)));
         });
 
         let collections_query = RangeSet2::from(start..end_excl);
-        group.bench_function("range_collections", |b| {
+        group.bench_function(BenchmarkId::new("range_collections", case), |b| {
             b.iter(|| black_box(black_box(&collections_set) & black_box(&collections_query)));
         });
 

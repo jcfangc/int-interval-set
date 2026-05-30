@@ -1,4 +1,4 @@
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use int_interval::I32CO;
 use int_interval_set::I32COSet;
 
@@ -39,10 +39,10 @@ fn int_interval_set(bounds: &[Bounds]) -> I32COSet {
 }
 
 fn bench_case(c: &mut Criterion, case: &str, query: Bounds, set: &I32COSet) {
-    let mut group = c.benchmark_group(format!("coverage_ratio_f64_of/{case}"));
+    let mut group = c.benchmark_group("coverage_ratio_f64_of");
     let query = I32CO::try_new(query.0, query.1).unwrap();
 
-    group.bench_function("int_interval_set", |b| {
+    group.bench_function(BenchmarkId::new("int_interval_set", case), |b| {
         b.iter(|| black_box(black_box(set).coverage_ratio_f64_of(black_box(query))));
     });
 

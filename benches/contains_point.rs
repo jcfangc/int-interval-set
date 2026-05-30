@@ -1,4 +1,4 @@
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use int_interval::I32CO;
 use int_interval_set::I32COSet;
 use range_collections::RangeSet2;
@@ -19,7 +19,7 @@ const CASES: &[(&str, i32)] = &[
     ("after_all", 256),
 ];
 
-/// 64 个互不相邻区间：[0, 2), [4, 6), ..., [252, 254)。
+/// Produces 64 non-adjacent intervals: `[0, 2), [4, 6), ..., [252, 254)`.
 fn bounds() -> Vec<Bounds> {
     (0..N)
         .map(|i| {
@@ -64,17 +64,17 @@ fn bench_contains_point(c: &mut Criterion) {
     let range_collections = build_range_collections(&bounds);
 
     for &(case, point) in CASES {
-        let mut group = c.benchmark_group(format!("contains_point/{case}"));
+        let mut group = c.benchmark_group("contains_point");
 
-        group.bench_function("int_interval_set", |b| {
+        group.bench_function(BenchmarkId::new("int_interval_set", case), |b| {
             b.iter(|| black_box(&int_interval_set).contains_point(black_box(point)))
         });
 
-        group.bench_function("range_set_blaze", |b| {
+        group.bench_function(BenchmarkId::new("range_set_blaze", case), |b| {
             b.iter(|| black_box(&range_set_blaze).contains(black_box(point)))
         });
 
-        group.bench_function("range_collections", |b| {
+        group.bench_function(BenchmarkId::new("range_collections", case), |b| {
             b.iter(|| black_box(&range_collections).contains(black_box(&point)))
         });
 

@@ -1,4 +1,4 @@
-use criterion::{Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use int_interval::I32CO;
 use int_interval_set::I32COSet;
 use range_collections::RangeSet2;
@@ -9,7 +9,7 @@ type Bounds = (i32, i32);
 const N: usize = 64;
 const STRIDE: i32 = 8;
 
-/// 左集合：[0, 4), [8, 12), ..., 共 64 个规范化区间。
+/// Produces the left-hand set: `[0, 4), [8, 12), ...`, 64 intervals total.
 fn lhs_bounds() -> Vec<Bounds> {
     (0..N)
         .map(|i| {
@@ -19,7 +19,7 @@ fn lhs_bounds() -> Vec<Bounds> {
         .collect()
 }
 
-/// 与左集合元素不重叠，但恰好填满全部间隙；异或结果合并为一个连续区间。
+/// Produces intervals that fill the gaps between left-hand intervals.
 fn disjoint_rhs() -> Vec<Bounds> {
     (0..N)
         .map(|i| {
@@ -29,12 +29,12 @@ fn disjoint_rhs() -> Vec<Bounds> {
         .collect()
 }
 
-/// 与左集合完全相同；异或结果为空集。
+/// Produces a right-hand set equal to the left-hand set.
 fn equal_rhs() -> Vec<Bounds> {
     lhs_bounds()
 }
 
-/// 每个右区间与对应左区间重叠一半；异或结果高度碎片化。
+/// Produces intervals that overlap half of each left-hand interval.
 fn partial_overlap_rhs() -> Vec<Bounds> {
     (0..N)
         .map(|i| {
@@ -44,7 +44,7 @@ fn partial_overlap_rhs() -> Vec<Bounds> {
         .collect()
 }
 
-/// 仅覆盖偶数编号的左区间；异或结果保留奇数编号区间。
+/// Produces intervals that cover only even-indexed left-hand intervals.
 fn alternating_rhs() -> Vec<Bounds> {
     (0..N)
         .step_by(2)
@@ -55,7 +55,7 @@ fn alternating_rhs() -> Vec<Bounds> {
         .collect()
 }
 
-/// 一个连续右区间覆盖中段；异或结果保留外侧左区间与中段间隙。
+/// Produces one continuous interval covering the middle portion.
 fn broad_middle_rhs() -> Vec<Bounds> {
     vec![(16 * STRIDE, 48 * STRIDE)]
 }
@@ -97,20 +97,20 @@ fn bench_case(c: &mut Criterion, case: &str, lhs: &[Bounds], rhs: &[Bounds]) {
     let collections_lhs = build_range_collections(lhs);
     let collections_rhs = build_range_collections(rhs);
 
-    let mut group = c.benchmark_group(format!("symmetric_difference_with_set/{case}"));
+    let mut group = c.benchmark_group("symmetric_difference_with_set");
     group.throughput(Throughput::Elements((lhs.len() + rhs.len()) as u64));
 
-    group.bench_function("int_interval_set", |b| {
+    group.bench_function(BenchmarkId::new("int_interval_set", case), |b| {
         b.iter(|| {
             black_box(&int_interval_lhs).symmetric_difference_with_set(black_box(&int_interval_rhs))
         })
     });
 
-    group.bench_function("range_set_blaze", |b| {
+    group.bench_function(BenchmarkId::new("range_set_blaze", case), |b| {
         b.iter(|| black_box(&blaze_lhs) ^ black_box(&blaze_rhs))
     });
 
-    group.bench_function("range_collections", |b| {
+    group.bench_function(BenchmarkId::new("range_collections", case), |b| {
         b.iter(|| black_box(&collections_lhs) ^ black_box(&collections_rhs))
     });
 

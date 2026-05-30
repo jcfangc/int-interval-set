@@ -1,4 +1,4 @@
-use criterion::{Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use int_interval::I32CO;
 use int_interval_set::I32COSet;
 use range_collections::RangeSet2;
@@ -8,11 +8,12 @@ type Bounds = (i32, i32);
 
 const N: i32 = 64;
 
-/// 左侧集合：64 个长度为 8、间隔为 8 的规范化区间。
-///
 /// ```text
 /// [0, 8), [16, 24), ..., [1008, 1016)
 /// ```
+/// Produces the left-hand set: 64 intervals of length 8 separated by gaps of length 8.
+///
+/// Layout: `[0, 8), [16, 24), ..., [1008, 1016)`.
 fn lhs_bounds() -> Vec<Bounds> {
     (0..N)
         .map(|i| {
@@ -22,12 +23,12 @@ fn lhs_bounds() -> Vec<Bounds> {
         .collect()
 }
 
-/// 与左侧完全相等；并集输出仍为 64 段。
+/// Produces a right-hand set equal to the left-hand set.
 fn equal_rhs() -> Vec<Bounds> {
     lhs_bounds()
 }
 
-/// 每段都位于左侧区间内部；并集输出仍为 64 段。
+/// Produces intervals fully contained inside the left-hand intervals.
 fn contained_rhs() -> Vec<Bounds> {
     (0..N)
         .map(|i| {
@@ -37,7 +38,7 @@ fn contained_rhs() -> Vec<Bounds> {
         .collect()
 }
 
-/// 每段与左侧区间右侧发生部分重叠；并集输出为 64 段。
+/// Produces intervals that partially overlap the right side of each left-hand interval.
 fn overlapping_rhs() -> Vec<Bounds> {
     (0..N)
         .map(|i| {
@@ -47,7 +48,7 @@ fn overlapping_rhs() -> Vec<Bounds> {
         .collect()
 }
 
-/// 每段落在左侧区间的 gap 内且不相邻；并集输出为 128 段。
+/// Produces intervals in the gaps between left-hand intervals without adjacency.
 fn interleaved_disjoint_rhs() -> Vec<Bounds> {
     (0..N)
         .map(|i| {
@@ -57,7 +58,7 @@ fn interleaved_disjoint_rhs() -> Vec<Bounds> {
         .collect()
 }
 
-/// 每段填满左侧区间之间的 gap；并集输出压缩为单一区间。
+/// Produces intervals that bridge all gaps and canonicalize the union into one interval.
 fn adjacent_bridge_rhs() -> Vec<Bounds> {
     (0..N)
         .map(|i| {
@@ -96,24 +97,24 @@ fn range_collections(bounds: &[Bounds]) -> RangeSet2<i32> {
 }
 
 fn bench_case(c: &mut Criterion, case: &str, lhs: &[Bounds], rhs: &[Bounds]) {
-    let mut group = c.benchmark_group(format!("union_with_set/{case}"));
+    let mut group = c.benchmark_group("union_with_set");
     group.throughput(Throughput::Elements((lhs.len() + rhs.len()) as u64));
 
     let lhs_int = int_interval_set(lhs);
     let rhs_int = int_interval_set(rhs);
-    group.bench_function("int_interval_set", |b| {
+    group.bench_function(BenchmarkId::new("int_interval_set", case), |b| {
         b.iter(|| black_box(black_box(&lhs_int).union_with_set(black_box(&rhs_int))));
     });
 
     let lhs_blaze = range_set_blaze(lhs);
     let rhs_blaze = range_set_blaze(rhs);
-    group.bench_function("range_set_blaze", |b| {
+    group.bench_function(BenchmarkId::new("range_set_blaze", case), |b| {
         b.iter(|| black_box(black_box(&lhs_blaze) | black_box(&rhs_blaze)));
     });
 
     let lhs_collections = range_collections(lhs);
     let rhs_collections = range_collections(rhs);
-    group.bench_function("range_collections", |b| {
+    group.bench_function(BenchmarkId::new("range_collections", case), |b| {
         b.iter(|| black_box(black_box(&lhs_collections) | black_box(&rhs_collections)));
     });
 

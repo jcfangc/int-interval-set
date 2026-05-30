@@ -1,4 +1,4 @@
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use int_interval::I32CO;
 use int_interval_set::I32COSet;
 
@@ -19,7 +19,7 @@ const CASES: &[(&str, Bounds)] = &[
     ("outer_padded_span", (-8, 63 * STRIDE + WIDTH + 8)),
 ];
 
-/// [0, 4), [8, 12), ..., [504, 508)。
+/// Produces `[0, 4), [8, 12), ..., [504, 508)`.
 fn set_bounds() -> Vec<Bounds> {
     (0..N)
         .map(|i| {
@@ -42,9 +42,9 @@ fn bench_uncovered_len_of(c: &mut Criterion) {
 
     for &(case, (start, end_excl)) in CASES {
         let query = I32CO::try_new(start, end_excl).unwrap();
-        let mut group = c.benchmark_group(format!("uncovered_len_of/{case}"));
+        let mut group = c.benchmark_group("uncovered_len_of");
 
-        group.bench_function("int_interval_set", |b| {
+        group.bench_function(BenchmarkId::new("int_interval_set", case), |b| {
             b.iter(|| black_box(&set).uncovered_len_of(black_box(query)))
         });
 

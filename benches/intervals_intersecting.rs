@@ -1,4 +1,4 @@
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use int_interval::I32CO;
 use int_interval_set::I32COSet;
 use rangemap::RangeSet;
@@ -15,11 +15,12 @@ const CASES: &[(&str, Bounds)] = &[
     ("covers_all", (-16, 1032)),
 ];
 
-/// 64 个规范化区间：每段长度 12，段间 gap 长度 4。
-///
 /// ```text
 /// [0, 12), [16, 28), ..., [1008, 1020)
 /// ```
+/// Produces 64 canonical intervals of length 12 separated by gaps of length 4.
+///
+/// Layout: `[0, 12), [16, 28), ..., [1008, 1020)`.
 fn source_bounds() -> Vec<Bounds> {
     (0..INTERVAL_COUNT)
         .map(|i| {
@@ -55,10 +56,10 @@ fn bench_intervals_intersecting(c: &mut Criterion) {
     let rangemap_set = rangemap_set(&bounds);
 
     for &(case, (start, end_excl)) in CASES {
-        let mut group = c.benchmark_group(format!("intervals_intersecting/{case}"));
+        let mut group = c.benchmark_group("intervals_intersecting");
 
         let int_query = I32CO::try_new(start, end_excl).unwrap();
-        group.bench_function("int_interval_set", |b| {
+        group.bench_function(BenchmarkId::new("int_interval_set", case), |b| {
             b.iter(|| {
                 let count = black_box(&int_set)
                     .intervals_intersecting(black_box(int_query))
@@ -72,7 +73,7 @@ fn bench_intervals_intersecting(c: &mut Criterion) {
         });
 
         let rangemap_query = start..end_excl;
-        group.bench_function("rangemap", |b| {
+        group.bench_function(BenchmarkId::new("rangemap", case), |b| {
             b.iter(|| {
                 let count = black_box(&rangemap_set)
                     .overlapping(black_box(&rangemap_query))

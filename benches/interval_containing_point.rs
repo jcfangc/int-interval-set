@@ -1,4 +1,4 @@
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use int_interval::I32CO;
 use int_interval_set::I32COSet;
 
@@ -17,7 +17,7 @@ const CASES: &[(&str, i32)] = &[
     ("after_all", 256),
 ];
 
-/// 64 个互不相邻区间：[0, 2), [4, 6), ..., [252, 254)。
+/// Produces 64 non-adjacent intervals: `[0, 2), [4, 6), ..., [252, 254)`.
 fn bounds() -> Vec<Bounds> {
     (0..N)
         .map(|i| {
@@ -39,9 +39,9 @@ fn bench_interval_containing_point(c: &mut Criterion) {
     let set = build_set(&bounds());
 
     for &(case, point) in CASES {
-        let mut group = c.benchmark_group(format!("interval_containing_point/{case}"));
+        let mut group = c.benchmark_group("interval_containing_point");
 
-        group.bench_function("int_interval_set", |b| {
+        group.bench_function(BenchmarkId::new("int_interval_set", case), |b| {
             b.iter(|| black_box(&set).interval_containing_point(black_box(point)))
         });
 

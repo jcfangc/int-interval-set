@@ -1,4 +1,4 @@
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use int_interval::I32CO;
 use int_interval_set::I32COSet;
 
@@ -15,11 +15,12 @@ const CASES: &[(&str, Bounds)] = &[
     ("mostly_outside", (-512, 1536)),
 ];
 
-/// 64 个规范化区间：每段长度 12，段间 gap 长度 4。
-///
 /// ```text
 /// [0, 12), [16, 28), ..., [1008, 1020)
 /// ```
+/// Produces 64 canonical intervals of length 12 separated by gaps of length 4.
+///
+/// Layout: `[0, 12), [16, 28), ..., [1008, 1020)`.
 fn source_set() -> I32COSet {
     (0..INTERVAL_COUNT)
         .map(|i| {
@@ -33,11 +34,11 @@ fn bench_coverage_ratio_f32_of(c: &mut Criterion) {
     let set = source_set();
 
     for &(case, (start, end_excl)) in CASES {
-        let mut group = c.benchmark_group(format!("coverage_ratio_f32_of/{case}"));
+        let mut group = c.benchmark_group("coverage_ratio_f32_of");
 
         let query = I32CO::try_new(start, end_excl).unwrap();
 
-        group.bench_function("int_interval_set", |b| {
+        group.bench_function(BenchmarkId::new("int_interval_set", case), |b| {
             b.iter(|| black_box(black_box(&set).coverage_ratio_f32_of(black_box(query))));
         });
 
