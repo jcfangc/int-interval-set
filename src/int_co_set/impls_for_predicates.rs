@@ -6,8 +6,10 @@ impl<I: IntCO> IntCOSet<I> {
     /// Complexity: `O(log n)`.
     #[inline]
     pub fn contains_point(&self, x: I::CoordType) -> bool {
-        let i = self.intervals.partition_point(|iv| iv.start() <= x);
-        i != 0 && self.intervals[i - 1].contains(x)
+        let intervals = self.intervals.as_ref();
+        let i = intervals.partition_point(|iv| iv.start() <= x);
+
+        i != 0 && x < intervals[i - 1].end_excl()
     }
 
     /// Returns whether `query` is fully contained by one interval.
