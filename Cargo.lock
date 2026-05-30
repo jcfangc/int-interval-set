@@ -479,7 +479,7 @@ checksum = "2986cdcef5df101e94889bd1ed7d82df7163bc323b2d853fac2625be0dc32ab3"
 
 [[package]]
 name = "int-interval-set"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "codspeed-criterion-compat",
  "int-interval",
