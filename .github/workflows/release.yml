@@ -21,54 +21,22 @@ on:
         type: choice
         options: ["false", "true"]
 
+permissions:
+  contents: write
+
 concurrency:
   group: crates-release-main
   cancel-in-progress: false
 
 jobs:
-  detect:
-    runs-on: ubuntu-latest
-    outputs:
-      changed: ${{ steps.v.outputs.changed }}
-      version: ${{ steps.v.outputs.version }}
-      prev_version: ${{ steps.v.outputs.prev_version }}
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - id: v
-        name: Detect version
-        run: python3 .github/scripts/release/detect_version.py
-
-  publish_and_tag:
-    needs: [detect]
-    if: |
-      (github.event_name == 'push' && needs.detect.outputs.changed == 'true') ||
-      (github.event_name == 'workflow_dispatch')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-          persist-credentials: true
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Publish
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
-          RELEASE_MODE: ${{ inputs.mode }}
-        run: python3 .github/scripts/release/publish.py
-
-      - name: Create and push tag
-        env:
-          RELEASE_VERSION: ${{ needs.detect.outputs.version }}
-          RELEASE_MODE: ${{ inputs.mode }}
-          TAG_DRYRUN: ${{ inputs.tag_dryrun }}
-        run: python3 .github/scripts/release/tag_release.py
+  release:
+    uses: jcfangc/ci/.github/workflows/rust-crates-release.yml@v0.2.0
+    with:
+      mode: ${{ inputs.mode || 'real' }}
+      tag_dryrun: ${{ inputs.tag_dryrun || 'false' }}
+      rust_toolchain: stable
+      package_manifest: Cargo.toml
+      test_command: cargo test --locked
+      run_tests: true
+    secrets:
+      CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
