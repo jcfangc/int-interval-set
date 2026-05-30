@@ -3,7 +3,7 @@ members = ["."]
 
 [package]
 name = "int-interval-set"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2024"
 description = "Integer half-open interval set structures built on top of int-interval."
 license = "MIT OR Apache-2.0"
