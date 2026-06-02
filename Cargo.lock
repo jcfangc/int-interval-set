@@ -473,13 +473,13 @@ dependencies = [
 
 [[package]]
 name = "int-interval"
-version = "0.9.3"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "553873f54df0d13cfb7ed66cf132d7e2e36daab1b5dfbc2f63be2cb6f44a4d2f"
+checksum = "08db9399b8c2ea7c64cfe7cb73871f6d206eb3bdb4034d870afe753b3847ae7e"
 
 [[package]]
 name = "int-interval-set"
-version = "0.3.3"
+version = "0.3.4"
 dependencies = [
  "codspeed-criterion-compat",
  "int-interval",
