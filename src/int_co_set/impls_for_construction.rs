@@ -22,7 +22,7 @@ impl<I: IntCO> IntCOSet<I> {
     /// Violating this invariant can make binary-search based queries
     /// return incorrect results.
     #[inline]
-    pub(super) unsafe fn new_unchecked(intervals: Vec<I>) -> Self {
+    pub unsafe fn new_unchecked(intervals: Vec<I>) -> Self {
         debug_assert!(is_canonical(&intervals));
 
         Self {
