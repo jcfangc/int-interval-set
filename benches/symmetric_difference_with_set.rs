@@ -1,15 +1,114 @@
-use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+use divan::{Bencher, black_box};
 use int_interval::I32CO;
 use int_interval_set::I32COSet;
 use range_collections::RangeSet2;
 use range_set_blaze::RangeSetBlaze;
+
+fn main() {
+    divan::main();
+}
 
 type Bounds = (i32, i32);
 
 const N: usize = 64;
 const STRIDE: i32 = 8;
 
-/// Produces the left-hand set: `[0, 4), [8, 12), ...`, 64 intervals total.
+#[divan::bench(name = "symmetric_difference_with_set/disjoint_64x64/int_interval_set")]
+fn symmetric_difference_with_set_disjoint_64x64_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, &lhs_bounds(), &disjoint_rhs());
+}
+
+#[divan::bench(name = "symmetric_difference_with_set/disjoint_64x64/range_set_blaze")]
+fn symmetric_difference_with_set_disjoint_64x64_range_set_blaze(bencher: Bencher) {
+    bench_range_set_blaze(bencher, &lhs_bounds(), &disjoint_rhs());
+}
+
+#[divan::bench(name = "symmetric_difference_with_set/disjoint_64x64/range_collections")]
+fn symmetric_difference_with_set_disjoint_64x64_range_collections(bencher: Bencher) {
+    bench_range_collections(bencher, &lhs_bounds(), &disjoint_rhs());
+}
+
+#[divan::bench(name = "symmetric_difference_with_set/equal_64x64/int_interval_set")]
+fn symmetric_difference_with_set_equal_64x64_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, &lhs_bounds(), &equal_rhs());
+}
+
+#[divan::bench(name = "symmetric_difference_with_set/equal_64x64/range_set_blaze")]
+fn symmetric_difference_with_set_equal_64x64_range_set_blaze(bencher: Bencher) {
+    bench_range_set_blaze(bencher, &lhs_bounds(), &equal_rhs());
+}
+
+#[divan::bench(name = "symmetric_difference_with_set/equal_64x64/range_collections")]
+fn symmetric_difference_with_set_equal_64x64_range_collections(bencher: Bencher) {
+    bench_range_collections(bencher, &lhs_bounds(), &equal_rhs());
+}
+
+#[divan::bench(name = "symmetric_difference_with_set/partial_overlap_64x64/int_interval_set")]
+fn symmetric_difference_with_set_partial_overlap_64x64_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, &lhs_bounds(), &partial_overlap_rhs());
+}
+
+#[divan::bench(name = "symmetric_difference_with_set/partial_overlap_64x64/range_set_blaze")]
+fn symmetric_difference_with_set_partial_overlap_64x64_range_set_blaze(bencher: Bencher) {
+    bench_range_set_blaze(bencher, &lhs_bounds(), &partial_overlap_rhs());
+}
+
+#[divan::bench(name = "symmetric_difference_with_set/partial_overlap_64x64/range_collections")]
+fn symmetric_difference_with_set_partial_overlap_64x64_range_collections(bencher: Bencher) {
+    bench_range_collections(bencher, &lhs_bounds(), &partial_overlap_rhs());
+}
+
+#[divan::bench(name = "symmetric_difference_with_set/alternating_64x32/int_interval_set")]
+fn symmetric_difference_with_set_alternating_64x32_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, &lhs_bounds(), &alternating_rhs());
+}
+
+#[divan::bench(name = "symmetric_difference_with_set/alternating_64x32/range_set_blaze")]
+fn symmetric_difference_with_set_alternating_64x32_range_set_blaze(bencher: Bencher) {
+    bench_range_set_blaze(bencher, &lhs_bounds(), &alternating_rhs());
+}
+
+#[divan::bench(name = "symmetric_difference_with_set/alternating_64x32/range_collections")]
+fn symmetric_difference_with_set_alternating_64x32_range_collections(bencher: Bencher) {
+    bench_range_collections(bencher, &lhs_bounds(), &alternating_rhs());
+}
+
+#[divan::bench(name = "symmetric_difference_with_set/broad_middle_64x1/int_interval_set")]
+fn symmetric_difference_with_set_broad_middle_64x1_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, &lhs_bounds(), &broad_middle_rhs());
+}
+
+#[divan::bench(name = "symmetric_difference_with_set/broad_middle_64x1/range_set_blaze")]
+fn symmetric_difference_with_set_broad_middle_64x1_range_set_blaze(bencher: Bencher) {
+    bench_range_set_blaze(bencher, &lhs_bounds(), &broad_middle_rhs());
+}
+
+#[divan::bench(name = "symmetric_difference_with_set/broad_middle_64x1/range_collections")]
+fn symmetric_difference_with_set_broad_middle_64x1_range_collections(bencher: Bencher) {
+    bench_range_collections(bencher, &lhs_bounds(), &broad_middle_rhs());
+}
+
+fn bench_int_interval_set(bencher: Bencher, lhs: &[Bounds], rhs: &[Bounds]) {
+    let lhs = build_int_interval_set(lhs);
+    let rhs = build_int_interval_set(rhs);
+
+    bencher.bench(|| black_box(&lhs).symmetric_difference_with_set(black_box(&rhs)));
+}
+
+fn bench_range_set_blaze(bencher: Bencher, lhs: &[Bounds], rhs: &[Bounds]) {
+    let lhs = build_range_set_blaze(lhs);
+    let rhs = build_range_set_blaze(rhs);
+
+    bencher.bench(|| black_box(&lhs) ^ black_box(&rhs));
+}
+
+fn bench_range_collections(bencher: Bencher, lhs: &[Bounds], rhs: &[Bounds]) {
+    let lhs = build_range_collections(lhs);
+    let rhs = build_range_collections(rhs);
+
+    bencher.bench(|| black_box(&lhs) ^ black_box(&rhs));
+}
+
 fn lhs_bounds() -> Vec<Bounds> {
     (0..N)
         .map(|i| {
@@ -19,7 +118,6 @@ fn lhs_bounds() -> Vec<Bounds> {
         .collect()
 }
 
-/// Produces intervals that fill the gaps between left-hand intervals.
 fn disjoint_rhs() -> Vec<Bounds> {
     (0..N)
         .map(|i| {
@@ -29,12 +127,10 @@ fn disjoint_rhs() -> Vec<Bounds> {
         .collect()
 }
 
-/// Produces a right-hand set equal to the left-hand set.
 fn equal_rhs() -> Vec<Bounds> {
     lhs_bounds()
 }
 
-/// Produces intervals that overlap half of each left-hand interval.
 fn partial_overlap_rhs() -> Vec<Bounds> {
     (0..N)
         .map(|i| {
@@ -44,7 +140,6 @@ fn partial_overlap_rhs() -> Vec<Bounds> {
         .collect()
 }
 
-/// Produces intervals that cover only even-indexed left-hand intervals.
 fn alternating_rhs() -> Vec<Bounds> {
     (0..N)
         .step_by(2)
@@ -55,7 +150,6 @@ fn alternating_rhs() -> Vec<Bounds> {
         .collect()
 }
 
-/// Produces one continuous interval covering the middle portion.
 fn broad_middle_rhs() -> Vec<Bounds> {
     vec![(16 * STRIDE, 48 * STRIDE)]
 }
@@ -86,53 +180,3 @@ fn build_range_collections(bounds: &[Bounds]) -> RangeSet2<i32> {
 
     set
 }
-
-fn bench_case(c: &mut Criterion, case: &str, lhs: &[Bounds], rhs: &[Bounds]) {
-    let int_interval_lhs = build_int_interval_set(lhs);
-    let int_interval_rhs = build_int_interval_set(rhs);
-
-    let blaze_lhs = build_range_set_blaze(lhs);
-    let blaze_rhs = build_range_set_blaze(rhs);
-
-    let collections_lhs = build_range_collections(lhs);
-    let collections_rhs = build_range_collections(rhs);
-
-    let mut group = c.benchmark_group("symmetric_difference_with_set");
-    group.throughput(Throughput::Elements((lhs.len() + rhs.len()) as u64));
-
-    group.bench_function(BenchmarkId::new("int_interval_set", case), |b| {
-        b.iter(|| {
-            black_box(&int_interval_lhs).symmetric_difference_with_set(black_box(&int_interval_rhs))
-        })
-    });
-
-    group.bench_function(BenchmarkId::new("range_set_blaze", case), |b| {
-        b.iter(|| black_box(&blaze_lhs) ^ black_box(&blaze_rhs))
-    });
-
-    group.bench_function(BenchmarkId::new("range_collections", case), |b| {
-        b.iter(|| black_box(&collections_lhs) ^ black_box(&collections_rhs))
-    });
-
-    group.finish();
-}
-
-fn bench_symmetric_difference_with_set(c: &mut Criterion) {
-    let lhs = lhs_bounds();
-
-    bench_case(c, "disjoint_64x64", &lhs, &disjoint_rhs());
-    bench_case(c, "equal_64x64", &lhs, &equal_rhs());
-    bench_case(c, "partial_overlap_64x64", &lhs, &partial_overlap_rhs());
-    bench_case(c, "alternating_64x32", &lhs, &alternating_rhs());
-    bench_case(c, "broad_middle_64x1", &lhs, &broad_middle_rhs());
-}
-
-mod support;
-
-criterion_group! {
-    name = benches;
-    config = support::config();
-    targets = bench_symmetric_difference_with_set
-}
-
-criterion_main!(benches);

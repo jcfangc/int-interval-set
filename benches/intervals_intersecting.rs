@@ -1,23 +1,101 @@
-use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use divan::{Bencher, black_box};
 use int_interval::I32CO;
 use int_interval_set::I32COSet;
 use rangemap::RangeSet;
+
+fn main() {
+    divan::main();
+}
 
 type Bounds = (i32, i32);
 
 const INTERVAL_COUNT: i32 = 64;
 
-const CASES: &[(&str, Bounds)] = &[
-    ("disjoint_left", (-32, -16)),
-    ("contained_middle", (514, 522)),
-    ("crosses_gap_middle", (520, 530)),
-    ("covers_middle_16", (384, 636)),
-    ("covers_all", (-16, 1032)),
-];
+#[divan::bench(name = "intervals_intersecting/disjoint_left/int_interval_set")]
+fn intervals_intersecting_disjoint_left_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, (-32, -16));
+}
 
-/// ```text
-/// [0, 12), [16, 28), ..., [1008, 1020)
-/// ```
+#[divan::bench(name = "intervals_intersecting/disjoint_left/rangemap")]
+fn intervals_intersecting_disjoint_left_rangemap(bencher: Bencher) {
+    bench_rangemap(bencher, (-32, -16));
+}
+
+#[divan::bench(name = "intervals_intersecting/contained_middle/int_interval_set")]
+fn intervals_intersecting_contained_middle_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, (514, 522));
+}
+
+#[divan::bench(name = "intervals_intersecting/contained_middle/rangemap")]
+fn intervals_intersecting_contained_middle_rangemap(bencher: Bencher) {
+    bench_rangemap(bencher, (514, 522));
+}
+
+#[divan::bench(name = "intervals_intersecting/crosses_gap_middle/int_interval_set")]
+fn intervals_intersecting_crosses_gap_middle_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, (520, 530));
+}
+
+#[divan::bench(name = "intervals_intersecting/crosses_gap_middle/rangemap")]
+fn intervals_intersecting_crosses_gap_middle_rangemap(bencher: Bencher) {
+    bench_rangemap(bencher, (520, 530));
+}
+
+#[divan::bench(name = "intervals_intersecting/covers_middle_16/int_interval_set")]
+fn intervals_intersecting_covers_middle_16_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, (384, 636));
+}
+
+#[divan::bench(name = "intervals_intersecting/covers_middle_16/rangemap")]
+fn intervals_intersecting_covers_middle_16_rangemap(bencher: Bencher) {
+    bench_rangemap(bencher, (384, 636));
+}
+
+#[divan::bench(name = "intervals_intersecting/covers_all/int_interval_set")]
+fn intervals_intersecting_covers_all_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, (-16, 1032));
+}
+
+#[divan::bench(name = "intervals_intersecting/covers_all/rangemap")]
+fn intervals_intersecting_covers_all_rangemap(bencher: Bencher) {
+    bench_rangemap(bencher, (-16, 1032));
+}
+
+fn bench_int_interval_set(bencher: Bencher, query: Bounds) {
+    let bounds = source_bounds();
+    let set = int_interval_set(&bounds);
+    let query = I32CO::try_new(query.0, query.1).unwrap();
+
+    bencher.bench(|| {
+        let count = black_box(&set)
+            .intervals_intersecting(black_box(query))
+            .fold(0usize, |count, interval| {
+                black_box(interval);
+                count + 1
+            });
+
+        black_box(count)
+    });
+}
+
+fn bench_rangemap(bencher: Bencher, query: Bounds) {
+    let bounds = source_bounds();
+    let set = rangemap_set(&bounds);
+    let query = query.0..query.1;
+
+    bencher.bench(|| {
+        let count =
+            black_box(&set)
+                .overlapping(black_box(&query))
+                .fold(0usize, |count, interval| {
+                    black_box(interval);
+                    count + 1
+                });
+
+        black_box(count)
+    });
+}
+
 /// Produces 64 canonical intervals of length 12 separated by gaps of length 4.
 ///
 /// Layout: `[0, 12), [16, 28), ..., [1008, 1020)`.
@@ -48,54 +126,3 @@ fn rangemap_set(bounds: &[Bounds]) -> RangeSet<i32> {
 
     set
 }
-
-fn bench_intervals_intersecting(c: &mut Criterion) {
-    let bounds = source_bounds();
-
-    let int_set = int_interval_set(&bounds);
-    let rangemap_set = rangemap_set(&bounds);
-
-    for &(case, (start, end_excl)) in CASES {
-        let mut group = c.benchmark_group("intervals_intersecting");
-
-        let int_query = I32CO::try_new(start, end_excl).unwrap();
-        group.bench_function(BenchmarkId::new("int_interval_set", case), |b| {
-            b.iter(|| {
-                let count = black_box(&int_set)
-                    .intervals_intersecting(black_box(int_query))
-                    .fold(0usize, |count, interval| {
-                        black_box(interval);
-                        count + 1
-                    });
-
-                black_box(count)
-            });
-        });
-
-        let rangemap_query = start..end_excl;
-        group.bench_function(BenchmarkId::new("rangemap", case), |b| {
-            b.iter(|| {
-                let count = black_box(&rangemap_set)
-                    .overlapping(black_box(&rangemap_query))
-                    .fold(0usize, |count, interval| {
-                        black_box(interval);
-                        count + 1
-                    });
-
-                black_box(count)
-            });
-        });
-
-        group.finish();
-    }
-}
-
-mod support;
-
-criterion_group! {
-    name = benches;
-    config = support::config();
-    targets = bench_intervals_intersecting
-}
-
-criterion_main!(benches);

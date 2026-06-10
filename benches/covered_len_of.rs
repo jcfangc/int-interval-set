@@ -1,25 +1,45 @@
-use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use divan::{Bencher, black_box};
 use int_interval::I32CO;
 use int_interval_set::I32COSet;
+
+fn main() {
+    divan::main();
+}
 
 type Bounds = (i32, i32);
 
 const N: usize = 64;
 
-const QUERIES: &[(&str, Bounds)] = &[
-    ("disjoint_before", (-32, -16)),
-    ("adjacent_before_first", (-8, 0)),
-    ("contained_single", (258, 262)),
-    ("span_single_and_gap", (258, 274)),
-    ("span_many_middle", (250, 582)),
-    ("cover_all", (-16, 1032)),
-];
+#[divan::bench(name = "covered_len_of/disjoint_before/int_interval_set")]
+fn covered_len_of_disjoint_before_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, (-32, -16));
+}
 
-/// Canonical source set:
-///
-/// ```text
-/// [0, 8), [16, 24), ..., [1008, 1016)
-/// ```
+#[divan::bench(name = "covered_len_of/adjacent_before_first/int_interval_set")]
+fn covered_len_of_adjacent_before_first_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, (-8, 0));
+}
+
+#[divan::bench(name = "covered_len_of/contained_single/int_interval_set")]
+fn covered_len_of_contained_single_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, (258, 262));
+}
+
+#[divan::bench(name = "covered_len_of/span_single_and_gap/int_interval_set")]
+fn covered_len_of_span_single_and_gap_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, (258, 274));
+}
+
+#[divan::bench(name = "covered_len_of/span_many_middle/int_interval_set")]
+fn covered_len_of_span_many_middle_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, (250, 582));
+}
+
+#[divan::bench(name = "covered_len_of/cover_all/int_interval_set")]
+fn covered_len_of_cover_all_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, (-16, 1032));
+}
+
 fn bounds() -> Vec<Bounds> {
     (0..N)
         .map(|i| {
@@ -29,6 +49,13 @@ fn bounds() -> Vec<Bounds> {
         .collect()
 }
 
+fn bench_int_interval_set(bencher: Bencher, query: Bounds) {
+    let set = int_interval_set(&bounds());
+    let query = I32CO::try_new(query.0, query.1).unwrap();
+
+    bencher.bench(|| black_box(black_box(&set).covered_len_of(black_box(query))));
+}
+
 #[inline]
 fn int_interval_set(bounds: &[Bounds]) -> I32COSet {
     bounds
@@ -36,32 +63,3 @@ fn int_interval_set(bounds: &[Bounds]) -> I32COSet {
         .map(|&(start, end_excl)| I32CO::try_new(start, end_excl).unwrap())
         .collect()
 }
-
-fn bench_case(c: &mut Criterion, case: &str, query: Bounds, set: &I32COSet) {
-    let mut group = c.benchmark_group("covered_len_of");
-    let query = I32CO::try_new(query.0, query.1).unwrap();
-
-    group.bench_function(BenchmarkId::new("int_interval_set", case), |b| {
-        b.iter(|| black_box(black_box(set).covered_len_of(black_box(query))));
-    });
-
-    group.finish();
-}
-
-fn bench_covered_len_of(c: &mut Criterion) {
-    let set = int_interval_set(&bounds());
-
-    for &(case, query) in QUERIES {
-        bench_case(c, case, query, &set);
-    }
-}
-
-mod support;
-
-criterion_group! {
-    name = benches;
-    config = support::config();
-    targets = bench_covered_len_of
-}
-
-criterion_main!(benches);

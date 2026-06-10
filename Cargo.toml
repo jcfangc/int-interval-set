@@ -15,10 +15,7 @@ int-interval = "0.9.4"
 rayon = "1.12.0"
 
 [dev-dependencies]
-criterion = { version = "4.7.0", package = "codspeed-criterion-compat", features = [
-    "html_reports",
-    "csv_output",
-] }
+divan = { package = "codspeed-divan-compat", version = "4.7.0" }
 proptest = "1.10.0"
 range-collections = "0.4.6"
 range-set-blaze = "0.5.0"
@@ -98,8 +95,4 @@ harness = false
 
 [[bench]]
 name = "coverage_ratio_f32_of"
-harness = false
-
-[[bench]]
-name = "coverage_ratio_f64_of"
 harness = false
