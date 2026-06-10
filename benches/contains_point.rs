@@ -1,23 +1,151 @@
-use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use divan::{Bencher, black_box};
 use int_interval::I32CO;
 use int_interval_set::I32COSet;
 use range_collections::RangeSet2;
 use range_set_blaze::RangeSetBlaze;
 
+fn main() {
+    divan::main();
+}
+
 type Bounds = (i32, i32);
 
 const N: usize = 64;
 
-const CASES: &[(&str, i32)] = &[
-    ("hit_first", 1),
-    ("gap_first", 2),
-    ("hit_middle", 129),
-    ("gap_middle", 130),
-    ("hit_last", 253),
-    ("gap_last", 254),
-    ("before_all", -1),
-    ("after_all", 256),
-];
+#[divan::bench(name = "contains_point/hit_first/int_interval_set")]
+fn contains_point_hit_first_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, 1);
+}
+
+#[divan::bench(name = "contains_point/hit_first/range_set_blaze")]
+fn contains_point_hit_first_range_set_blaze(bencher: Bencher) {
+    bench_range_set_blaze(bencher, 1);
+}
+
+#[divan::bench(name = "contains_point/hit_first/range_collections")]
+fn contains_point_hit_first_range_collections(bencher: Bencher) {
+    bench_range_collections(bencher, 1);
+}
+
+#[divan::bench(name = "contains_point/gap_first/int_interval_set")]
+fn contains_point_gap_first_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, 2);
+}
+
+#[divan::bench(name = "contains_point/gap_first/range_set_blaze")]
+fn contains_point_gap_first_range_set_blaze(bencher: Bencher) {
+    bench_range_set_blaze(bencher, 2);
+}
+
+#[divan::bench(name = "contains_point/gap_first/range_collections")]
+fn contains_point_gap_first_range_collections(bencher: Bencher) {
+    bench_range_collections(bencher, 2);
+}
+
+#[divan::bench(name = "contains_point/hit_middle/int_interval_set")]
+fn contains_point_hit_middle_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, 129);
+}
+
+#[divan::bench(name = "contains_point/hit_middle/range_set_blaze")]
+fn contains_point_hit_middle_range_set_blaze(bencher: Bencher) {
+    bench_range_set_blaze(bencher, 129);
+}
+
+#[divan::bench(name = "contains_point/hit_middle/range_collections")]
+fn contains_point_hit_middle_range_collections(bencher: Bencher) {
+    bench_range_collections(bencher, 129);
+}
+
+#[divan::bench(name = "contains_point/gap_middle/int_interval_set")]
+fn contains_point_gap_middle_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, 130);
+}
+
+#[divan::bench(name = "contains_point/gap_middle/range_set_blaze")]
+fn contains_point_gap_middle_range_set_blaze(bencher: Bencher) {
+    bench_range_set_blaze(bencher, 130);
+}
+
+#[divan::bench(name = "contains_point/gap_middle/range_collections")]
+fn contains_point_gap_middle_range_collections(bencher: Bencher) {
+    bench_range_collections(bencher, 130);
+}
+
+#[divan::bench(name = "contains_point/hit_last/int_interval_set")]
+fn contains_point_hit_last_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, 253);
+}
+
+#[divan::bench(name = "contains_point/hit_last/range_set_blaze")]
+fn contains_point_hit_last_range_set_blaze(bencher: Bencher) {
+    bench_range_set_blaze(bencher, 253);
+}
+
+#[divan::bench(name = "contains_point/hit_last/range_collections")]
+fn contains_point_hit_last_range_collections(bencher: Bencher) {
+    bench_range_collections(bencher, 253);
+}
+
+#[divan::bench(name = "contains_point/gap_last/int_interval_set")]
+fn contains_point_gap_last_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, 254);
+}
+
+#[divan::bench(name = "contains_point/gap_last/range_set_blaze")]
+fn contains_point_gap_last_range_set_blaze(bencher: Bencher) {
+    bench_range_set_blaze(bencher, 254);
+}
+
+#[divan::bench(name = "contains_point/gap_last/range_collections")]
+fn contains_point_gap_last_range_collections(bencher: Bencher) {
+    bench_range_collections(bencher, 254);
+}
+
+#[divan::bench(name = "contains_point/before_all/int_interval_set")]
+fn contains_point_before_all_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, -1);
+}
+
+#[divan::bench(name = "contains_point/before_all/range_set_blaze")]
+fn contains_point_before_all_range_set_blaze(bencher: Bencher) {
+    bench_range_set_blaze(bencher, -1);
+}
+
+#[divan::bench(name = "contains_point/before_all/range_collections")]
+fn contains_point_before_all_range_collections(bencher: Bencher) {
+    bench_range_collections(bencher, -1);
+}
+
+#[divan::bench(name = "contains_point/after_all/int_interval_set")]
+fn contains_point_after_all_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, 256);
+}
+
+#[divan::bench(name = "contains_point/after_all/range_set_blaze")]
+fn contains_point_after_all_range_set_blaze(bencher: Bencher) {
+    bench_range_set_blaze(bencher, 256);
+}
+
+#[divan::bench(name = "contains_point/after_all/range_collections")]
+fn contains_point_after_all_range_collections(bencher: Bencher) {
+    bench_range_collections(bencher, 256);
+}
+
+fn bench_int_interval_set(bencher: Bencher, point: i32) {
+    let set = build_int_interval_set(&bounds());
+    bencher.bench(|| black_box(&set).contains_point(black_box(point)));
+}
+
+fn bench_range_set_blaze(bencher: Bencher, point: i32) {
+    let set = build_range_set_blaze(&bounds());
+    bencher.bench(|| black_box(&set).contains(black_box(point)));
+}
+
+fn bench_range_collections(bencher: Bencher, point: i32) {
+    let set = build_range_collections(&bounds());
+    bencher.bench(|| black_box(&set).contains(black_box(&point)));
+}
 
 /// Produces 64 non-adjacent intervals: `[0, 2), [4, 6), ..., [252, 254)`.
 fn bounds() -> Vec<Bounds> {
@@ -55,39 +183,3 @@ fn build_range_collections(bounds: &[Bounds]) -> RangeSet2<i32> {
 
     set
 }
-
-fn bench_contains_point(c: &mut Criterion) {
-    let bounds = bounds();
-
-    let int_interval_set = build_int_interval_set(&bounds);
-    let range_set_blaze = build_range_set_blaze(&bounds);
-    let range_collections = build_range_collections(&bounds);
-
-    for &(case, point) in CASES {
-        let mut group = c.benchmark_group("contains_point");
-
-        group.bench_function(BenchmarkId::new("int_interval_set", case), |b| {
-            b.iter(|| black_box(&int_interval_set).contains_point(black_box(point)))
-        });
-
-        group.bench_function(BenchmarkId::new("range_set_blaze", case), |b| {
-            b.iter(|| black_box(&range_set_blaze).contains(black_box(point)))
-        });
-
-        group.bench_function(BenchmarkId::new("range_collections", case), |b| {
-            b.iter(|| black_box(&range_collections).contains(black_box(&point)))
-        });
-
-        group.finish();
-    }
-}
-
-mod support;
-
-criterion_group! {
-    name = benches;
-    config = support::config();
-    targets = bench_contains_point
-}
-
-criterion_main!(benches);

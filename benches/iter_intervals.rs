@@ -1,19 +1,63 @@
-use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+use divan::{Bencher, black_box};
 use int_interval::I32CO;
 use int_interval_set::I32COSet;
 use range_collections::{RangeSet, RangeSet2};
 use range_set_blaze::RangeSetBlaze;
+
+fn main() {
+    divan::main();
+}
 
 type Bounds = (i32, i32);
 
 const N_SMALL: usize = 64;
 const N_LARGE: usize = 1024;
 
-/// Produces canonical disjoint intervals:
-///
-/// ```text
-/// [0, 4), [8, 12), [16, 20), ...
-/// ```
+#[divan::bench(name = "iter_intervals/merged_64_to_1/int_interval_set")]
+fn iter_intervals_merged_64_to_1_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, &adjacent_bounds(N_SMALL));
+}
+
+#[divan::bench(name = "iter_intervals/merged_64_to_1/range_set_blaze")]
+fn iter_intervals_merged_64_to_1_range_set_blaze(bencher: Bencher) {
+    bench_range_set_blaze(bencher, &adjacent_bounds(N_SMALL));
+}
+
+#[divan::bench(name = "iter_intervals/merged_64_to_1/range_collections")]
+fn iter_intervals_merged_64_to_1_range_collections(bencher: Bencher) {
+    bench_range_collections(bencher, &adjacent_bounds(N_SMALL));
+}
+
+#[divan::bench(name = "iter_intervals/sparse_64/int_interval_set")]
+fn iter_intervals_sparse_64_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, &sparse_bounds(N_SMALL));
+}
+
+#[divan::bench(name = "iter_intervals/sparse_64/range_set_blaze")]
+fn iter_intervals_sparse_64_range_set_blaze(bencher: Bencher) {
+    bench_range_set_blaze(bencher, &sparse_bounds(N_SMALL));
+}
+
+#[divan::bench(name = "iter_intervals/sparse_64/range_collections")]
+fn iter_intervals_sparse_64_range_collections(bencher: Bencher) {
+    bench_range_collections(bencher, &sparse_bounds(N_SMALL));
+}
+
+#[divan::bench(name = "iter_intervals/sparse_1024/int_interval_set")]
+fn iter_intervals_sparse_1024_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, &sparse_bounds(N_LARGE));
+}
+
+#[divan::bench(name = "iter_intervals/sparse_1024/range_set_blaze")]
+fn iter_intervals_sparse_1024_range_set_blaze(bencher: Bencher) {
+    bench_range_set_blaze(bencher, &sparse_bounds(N_LARGE));
+}
+
+#[divan::bench(name = "iter_intervals/sparse_1024/range_collections")]
+fn iter_intervals_sparse_1024_range_collections(bencher: Bencher) {
+    bench_range_collections(bencher, &sparse_bounds(N_LARGE));
+}
+
 fn sparse_bounds(n: usize) -> Vec<Bounds> {
     (0..n)
         .map(|i| {
@@ -23,7 +67,6 @@ fn sparse_bounds(n: usize) -> Vec<Bounds> {
         .collect()
 }
 
-/// Produces adjacent inputs that canonicalize into one interval.
 fn adjacent_bounds(n: usize) -> Vec<Bounds> {
     (0..n)
         .map(|i| {
@@ -31,6 +74,36 @@ fn adjacent_bounds(n: usize) -> Vec<Bounds> {
             (start, start + 4)
         })
         .collect()
+}
+
+fn bench_int_interval_set(bencher: Bencher, bounds: &[Bounds]) {
+    let set = int_interval_set(bounds);
+
+    bencher.bench(|| {
+        for interval in black_box(&set).iter_intervals() {
+            black_box(interval);
+        }
+    });
+}
+
+fn bench_range_set_blaze(bencher: Bencher, bounds: &[Bounds]) {
+    let set = range_set_blaze(bounds);
+
+    bencher.bench(|| {
+        for interval in black_box(&set).ranges() {
+            black_box(interval);
+        }
+    });
+}
+
+fn bench_range_collections(bencher: Bencher, bounds: &[Bounds]) {
+    let set = range_collections(bounds);
+
+    bencher.bench(|| {
+        for interval in black_box(&set).iter() {
+            black_box(interval);
+        }
+    });
 }
 
 #[inline]
@@ -59,61 +132,3 @@ fn range_collections(bounds: &[Bounds]) -> RangeSet2<i32> {
 
     set
 }
-
-fn bench_case(c: &mut Criterion, case: &str, bounds: &[Bounds]) {
-    let int_set = int_interval_set(bounds);
-    let blaze_set = range_set_blaze(bounds);
-    let collections_set = range_collections(bounds);
-
-    let output_intervals = int_set.interval_count();
-
-    let mut group = c.benchmark_group("iter_intervals");
-
-    group.throughput(Throughput::Elements(output_intervals as u64));
-
-    group.bench_function(BenchmarkId::new("int_interval_set", case), |b| {
-        b.iter(|| {
-            for interval in black_box(&int_set).iter_intervals() {
-                black_box(interval);
-            }
-        });
-    });
-
-    group.bench_function(BenchmarkId::new("range_set_blaze", case), |b| {
-        b.iter(|| {
-            for interval in black_box(&blaze_set).ranges() {
-                black_box(interval);
-            }
-        });
-    });
-
-    group.bench_function(BenchmarkId::new("range_collections", case), |b| {
-        b.iter(|| {
-            for interval in black_box(&collections_set).iter() {
-                black_box(interval);
-            }
-        });
-    });
-
-    group.finish();
-}
-
-fn bench_iter_intervals(c: &mut Criterion) {
-    let merged_64 = adjacent_bounds(N_SMALL);
-    let sparse_64 = sparse_bounds(N_SMALL);
-    let sparse_1024 = sparse_bounds(N_LARGE);
-
-    bench_case(c, "merged_64_to_1", &merged_64);
-    bench_case(c, "sparse_64", &sparse_64);
-    bench_case(c, "sparse_1024", &sparse_1024);
-}
-
-mod support;
-
-criterion_group! {
-    name = benches;
-    config = support::config();
-    targets = bench_iter_intervals
-}
-
-criterion_main!(benches);

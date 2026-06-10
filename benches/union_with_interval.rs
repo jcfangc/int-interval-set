@@ -1,26 +1,92 @@
-use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use divan::{Bencher, black_box};
 use int_interval::I32CO;
 use int_interval_set::I32COSet;
 use range_collections::{RangeSet, RangeSet2};
 use range_set_blaze::RangeSetBlaze;
 
+fn main() {
+    divan::main();
+}
+
 type Bounds = (i32, i32);
 
 const N: usize = 64;
 
-const QUERIES: &[(&str, Bounds)] = &[
-    ("disjoint_before", (-16, -8)),
-    ("adjacent_before_first", (-8, 0)),
-    ("contained_middle", (514, 518)),
-    ("bridge_middle_gap", (504, 512)),
-    ("bridge_many_middle", (498, 566)),
-];
+#[divan::bench(name = "union_with_interval/disjoint_before/int_interval_set")]
+fn union_with_interval_disjoint_before_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, (-16, -8));
+}
 
-/// Canonical source set:
-///
-/// ```text
-/// [0, 8), [16, 24), ..., [1008, 1016)
-/// ```
+#[divan::bench(name = "union_with_interval/disjoint_before/range_set_blaze")]
+fn union_with_interval_disjoint_before_range_set_blaze(bencher: Bencher) {
+    bench_range_set_blaze(bencher, (-16, -8));
+}
+
+#[divan::bench(name = "union_with_interval/disjoint_before/range_collections")]
+fn union_with_interval_disjoint_before_range_collections(bencher: Bencher) {
+    bench_range_collections(bencher, (-16, -8));
+}
+
+#[divan::bench(name = "union_with_interval/adjacent_before_first/int_interval_set")]
+fn union_with_interval_adjacent_before_first_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, (-8, 0));
+}
+
+#[divan::bench(name = "union_with_interval/adjacent_before_first/range_set_blaze")]
+fn union_with_interval_adjacent_before_first_range_set_blaze(bencher: Bencher) {
+    bench_range_set_blaze(bencher, (-8, 0));
+}
+
+#[divan::bench(name = "union_with_interval/adjacent_before_first/range_collections")]
+fn union_with_interval_adjacent_before_first_range_collections(bencher: Bencher) {
+    bench_range_collections(bencher, (-8, 0));
+}
+
+#[divan::bench(name = "union_with_interval/contained_middle/int_interval_set")]
+fn union_with_interval_contained_middle_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, (514, 518));
+}
+
+#[divan::bench(name = "union_with_interval/contained_middle/range_set_blaze")]
+fn union_with_interval_contained_middle_range_set_blaze(bencher: Bencher) {
+    bench_range_set_blaze(bencher, (514, 518));
+}
+
+#[divan::bench(name = "union_with_interval/contained_middle/range_collections")]
+fn union_with_interval_contained_middle_range_collections(bencher: Bencher) {
+    bench_range_collections(bencher, (514, 518));
+}
+
+#[divan::bench(name = "union_with_interval/bridge_middle_gap/int_interval_set")]
+fn union_with_interval_bridge_middle_gap_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, (504, 512));
+}
+
+#[divan::bench(name = "union_with_interval/bridge_middle_gap/range_set_blaze")]
+fn union_with_interval_bridge_middle_gap_range_set_blaze(bencher: Bencher) {
+    bench_range_set_blaze(bencher, (504, 512));
+}
+
+#[divan::bench(name = "union_with_interval/bridge_middle_gap/range_collections")]
+fn union_with_interval_bridge_middle_gap_range_collections(bencher: Bencher) {
+    bench_range_collections(bencher, (504, 512));
+}
+
+#[divan::bench(name = "union_with_interval/bridge_many_middle/int_interval_set")]
+fn union_with_interval_bridge_many_middle_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, (498, 566));
+}
+
+#[divan::bench(name = "union_with_interval/bridge_many_middle/range_set_blaze")]
+fn union_with_interval_bridge_many_middle_range_set_blaze(bencher: Bencher) {
+    bench_range_set_blaze(bencher, (498, 566));
+}
+
+#[divan::bench(name = "union_with_interval/bridge_many_middle/range_collections")]
+fn union_with_interval_bridge_many_middle_range_collections(bencher: Bencher) {
+    bench_range_collections(bencher, (498, 566));
+}
+
 fn bounds() -> Vec<Bounds> {
     (0..N)
         .map(|i| {
@@ -28,6 +94,30 @@ fn bounds() -> Vec<Bounds> {
             (start, start + 8)
         })
         .collect()
+}
+
+fn bench_int_interval_set(bencher: Bencher, query: Bounds) {
+    let bounds = bounds();
+    let set = int_interval_set(&bounds);
+    let query = I32CO::try_new(query.0, query.1).unwrap();
+
+    bencher.bench(|| black_box(black_box(&set).union_with_interval(black_box(query))));
+}
+
+fn bench_range_set_blaze(bencher: Bencher, query: Bounds) {
+    let bounds = bounds();
+    let set = range_set_blaze(&bounds);
+    let query = RangeSetBlaze::from_iter([query.0..=(query.1 - 1)]);
+
+    bencher.bench(|| black_box(black_box(&set) | black_box(&query)));
+}
+
+fn bench_range_collections(bencher: Bencher, query: Bounds) {
+    let bounds = bounds();
+    let set = range_collections(&bounds);
+    let query: RangeSet2<i32> = RangeSet::from(query.0..query.1);
+
+    bencher.bench(|| black_box(black_box(&set).union::<[i32; 2]>(black_box(&query))));
 }
 
 #[inline]
@@ -56,59 +146,3 @@ fn range_collections(bounds: &[Bounds]) -> RangeSet2<i32> {
 
     set
 }
-
-fn bench_case(
-    c: &mut Criterion,
-    case: &str,
-    query: Bounds,
-    int_set: &I32COSet,
-    blaze_set: &RangeSetBlaze<i32>,
-    collections_set: &RangeSet2<i32>,
-) {
-    let mut group = c.benchmark_group("union_with_interval");
-    let (start, end_excl) = query;
-
-    let int_query = I32CO::try_new(start, end_excl).unwrap();
-
-    let blaze_query = RangeSetBlaze::from_iter([start..=(end_excl - 1)]);
-
-    let collections_query: RangeSet2<i32> = RangeSet::from(start..end_excl);
-
-    group.bench_function(BenchmarkId::new("int_interval_set", case), |b| {
-        b.iter(|| black_box(black_box(int_set).union_with_interval(black_box(int_query))));
-    });
-
-    group.bench_function(BenchmarkId::new("range_set_blaze", case), |b| {
-        b.iter(|| black_box(black_box(blaze_set) | black_box(&blaze_query)));
-    });
-
-    group.bench_function(BenchmarkId::new("range_collections", case), |b| {
-        b.iter(|| {
-            black_box(black_box(collections_set).union::<[i32; 2]>(black_box(&collections_query)))
-        });
-    });
-
-    group.finish();
-}
-
-fn bench_union_with_interval(c: &mut Criterion) {
-    let bounds = bounds();
-
-    let int_set = int_interval_set(&bounds);
-    let blaze_set = range_set_blaze(&bounds);
-    let collections_set = range_collections(&bounds);
-
-    for &(case, query) in QUERIES {
-        bench_case(c, case, query, &int_set, &blaze_set, &collections_set);
-    }
-}
-
-mod support;
-
-criterion_group! {
-    name = benches;
-    config = support::config();
-    targets = bench_union_with_interval
-}
-
-criterion_main!(benches);

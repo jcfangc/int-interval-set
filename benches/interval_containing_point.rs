@@ -1,23 +1,55 @@
-use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use divan::{Bencher, black_box};
 use int_interval::I32CO;
 use int_interval_set::I32COSet;
+
+fn main() {
+    divan::main();
+}
 
 type Bounds = (i32, i32);
 
 const N: usize = 64;
 
-const CASES: &[(&str, i32)] = &[
-    ("hit_first", 1),
-    ("gap_first", 2),
-    ("hit_middle", 129),
-    ("gap_middle", 130),
-    ("hit_last", 253),
-    ("gap_last", 254),
-    ("before_all", -1),
-    ("after_all", 256),
-];
+#[divan::bench(name = "interval_containing_point/hit_first/int_interval_set")]
+fn interval_containing_point_hit_first_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, 1);
+}
 
-/// Produces 64 non-adjacent intervals: `[0, 2), [4, 6), ..., [252, 254)`.
+#[divan::bench(name = "interval_containing_point/gap_first/int_interval_set")]
+fn interval_containing_point_gap_first_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, 2);
+}
+
+#[divan::bench(name = "interval_containing_point/hit_middle/int_interval_set")]
+fn interval_containing_point_hit_middle_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, 129);
+}
+
+#[divan::bench(name = "interval_containing_point/gap_middle/int_interval_set")]
+fn interval_containing_point_gap_middle_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, 130);
+}
+
+#[divan::bench(name = "interval_containing_point/hit_last/int_interval_set")]
+fn interval_containing_point_hit_last_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, 253);
+}
+
+#[divan::bench(name = "interval_containing_point/gap_last/int_interval_set")]
+fn interval_containing_point_gap_last_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, 254);
+}
+
+#[divan::bench(name = "interval_containing_point/before_all/int_interval_set")]
+fn interval_containing_point_before_all_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, -1);
+}
+
+#[divan::bench(name = "interval_containing_point/after_all/int_interval_set")]
+fn interval_containing_point_after_all_int_interval_set(bencher: Bencher) {
+    bench_int_interval_set(bencher, 256);
+}
+
 fn bounds() -> Vec<Bounds> {
     (0..N)
         .map(|i| {
@@ -27,6 +59,12 @@ fn bounds() -> Vec<Bounds> {
         .collect()
 }
 
+fn bench_int_interval_set(bencher: Bencher, point: i32) {
+    let set = build_set(&bounds());
+
+    bencher.bench(|| black_box(&set).interval_containing_point(black_box(point)));
+}
+
 #[inline]
 fn build_set(bounds: &[Bounds]) -> I32COSet {
     bounds
@@ -34,27 +72,3 @@ fn build_set(bounds: &[Bounds]) -> I32COSet {
         .map(|&(start, end_excl)| I32CO::try_new(start, end_excl).unwrap())
         .collect()
 }
-
-fn bench_interval_containing_point(c: &mut Criterion) {
-    let set = build_set(&bounds());
-
-    for &(case, point) in CASES {
-        let mut group = c.benchmark_group("interval_containing_point");
-
-        group.bench_function(BenchmarkId::new("int_interval_set", case), |b| {
-            b.iter(|| black_box(&set).interval_containing_point(black_box(point)))
-        });
-
-        group.finish();
-    }
-}
-
-mod support;
-
-criterion_group! {
-    name = benches;
-    config = support::config();
-    targets = bench_interval_containing_point
-}
-
-criterion_main!(benches);
