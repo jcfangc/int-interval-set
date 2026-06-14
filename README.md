@@ -4,6 +4,7 @@
 [![Documentation](https://docs.rs/int-interval-set/badge.svg)](https://docs.rs/int-interval-set)
 [![License](https://img.shields.io/crates/l/int-interval-set.svg)](https://crates.io/crates/int-interval-set)
 [![CodSpeed](https://github.com/jcfangc/int-interval-set/actions/workflows/codspeed.yml/badge.svg?branch=main)](https://github.com/jcfangc/int-interval-set/actions/workflows/codspeed.yml)
+[![Coverage](https://codecov.io/gh/jcfangc/int-interval-set/branch/main/graph/badge.svg)](https://codecov.io/gh/jcfangc/int-interval-set)
 
 
 `int-interval-set` provides immutable canonical interval-set containers for
