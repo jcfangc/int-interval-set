@@ -1,5 +1,15 @@
 # int-interval-set
 
+> **This crate is no longer maintained.**  
+> It has been merged into [`int-intervals`](https://crates.io/crates/int-intervals),
+> a unified crate with feature gates (`set`, `stack`).
+> See the [repository](https://github.com/jcfangc/int-intervals) for migration guidance.
+>
+> | Old crate | Replacement |
+> |-----------|-------------|
+> | `int-interval-set = "0.3"` | `int-intervals = { version = "0.1", features = ["set"] }` |
+> | `use int_interval_set::*` | `use int_intervals::*` |
+
 [![Crates.io](https://img.shields.io/crates/v/int-interval-set.svg)](https://crates.io/crates/int-interval-set)
 [![Documentation](https://docs.rs/int-interval-set/badge.svg)](https://docs.rs/int-interval-set)
 [![License](https://img.shields.io/crates/l/int-interval-set.svg)](https://crates.io/crates/int-interval-set)
