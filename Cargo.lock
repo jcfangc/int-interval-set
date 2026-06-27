@@ -375,7 +375,7 @@ checksum = "08db9399b8c2ea7c64cfe7cb73871f6d206eb3bdb4034d870afe753b3847ae7e"
 
 [[package]]
 name = "int-interval-set"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "codspeed-divan-compat",
  "int-interval",
